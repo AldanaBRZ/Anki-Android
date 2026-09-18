@@ -15,7 +15,6 @@
 package com.ichi2.anki.ankiquest
 
 import android.annotation.SuppressLint
-import androidx.core.net.toUri
 import android.os.Bundle
 import android.view.View
 import android.webkit.WebChromeClient
@@ -24,6 +23,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat.Type.displayCutout
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
