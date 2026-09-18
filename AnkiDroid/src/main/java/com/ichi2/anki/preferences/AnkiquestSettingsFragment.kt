@@ -13,18 +13,57 @@
  */
 package com.ichi2.anki.preferences
 
+import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.lifecycleScope
+import androidx.preference.Preference
 import com.ichi2.anki.R
+import com.ichi2.anki.ankiquest.Ankiquest
 import com.ichi2.preferences.VersatileTextPreference
+import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 class AnkiquestSettingsFragment : SettingsFragment() {
     override val preferenceResource = R.xml.preferences_ankiquest
     override val analyticsScreenNameConstant = "prefs.ankiquest"
 
+    private var running = false
+
     override fun initSubscreen() {
         requirePreference<VersatileTextPreference>(R.string.ankiquest_url_key).continuousValidator =
             VersatileTextPreference.Validator { value ->
                 if (value.isNotEmpty()) value.toHttpUrl()
             }
+        bindAction(R.string.ankiquest_test_key, uploadAll = false)
+        bindAction(R.string.ankiquest_upload_all_key, uploadAll = true)
+    }
+
+    private fun bindAction(
+        key: Int,
+        uploadAll: Boolean,
+    ) {
+        val preference = requirePreference<Preference>(key)
+        val idleSummary = preference.summary
+        preference.setOnPreferenceClickListener {
+            if (running) return@setOnPreferenceClickListener true
+            running = true
+            preference.summary = getString(R.string.ankiquest_check_running)
+            val context = requireContext()
+            lifecycleScope.launch {
+                val message =
+                    try {
+                        Ankiquest.runFromSettings(context, uploadAll)
+                    } finally {
+                        running = false
+                        preference.summary = idleSummary
+                    }
+                AlertDialog
+                    .Builder(context)
+                    .setTitle(preference.title)
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
+            true
+        }
     }
 }

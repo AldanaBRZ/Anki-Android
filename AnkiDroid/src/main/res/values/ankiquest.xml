@@ -8,6 +8,22 @@
     <string name="ankiquest_url_title" translatable="false" maxLength="41">ankiquest server URL</string>
     <string name="ankiquest_user_title" translatable="false" maxLength="41">ankiquest player</string>
     <string name="ankiquest_token_title" translatable="false" maxLength="41">ankiquest token</string>
+    <string name="ankiquest_test_key" translatable="false">ankiquestTest</string>
+    <string name="ankiquest_upload_all_key" translatable="false">ankiquestUploadAll</string>
+    <string name="ankiquest_test_title" translatable="false" maxLength="41">Test connection</string>
+    <string name="ankiquest_test_summary" translatable="false">Check the URL, player and token</string>
+    <string name="ankiquest_upload_all_title" translatable="false" maxLength="41">Upload all reviews now</string>
+    <string name="ankiquest_upload_all_summary" translatable="false">Send your whole review history. Already uploaded reviews are skipped by the server.</string>
+    <string name="ankiquest_check_running" translatable="false">Contacting the server…</string>
+    <string name="ankiquest_check_ok" translatable="false">Connected as %1$s: level %2$d, %3$d XP, %4$d reviews on the server.</string>
+    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored.</string>
+    <string name="ankiquest_check_unconfigured" translatable="false">Set the server URL and player first.</string>
+    <string name="ankiquest_check_unauthorized" translatable="false">The server rejected the player or token. Check both for typos.</string>
+    <string name="ankiquest_check_unknown_player" translatable="false">The server does not know this player yet. Set the token so your reviews can be uploaded.</string>
+    <string name="ankiquest_check_http" translatable="false">The server answered with HTTP %1$d.</string>
+    <string name="ankiquest_check_unreachable" translatable="false">Could not find %1$s. Check the URL and your internet connection.</string>
+    <string name="ankiquest_check_bad_url" translatable="false">%1$s is not a valid URL. It should look like https://anki.example.com</string>
+    <string name="ankiquest_check_failed" translatable="false">Could not reach the server: %1$s</string>
     <string name="ankiquest_update_title" translatable="false">%1$s available</string>
     <string name="ankiquest_update_message" translatable="false">A new AnkiDroid Quest build is ready (%1$d MB). Your collection is kept.</string>
     <string name="ankiquest_update_install" translatable="false">Update</string>

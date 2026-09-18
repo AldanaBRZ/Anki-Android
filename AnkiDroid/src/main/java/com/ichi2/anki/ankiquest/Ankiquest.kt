@@ -16,6 +16,7 @@ package com.ichi2.anki.ankiquest
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -28,6 +29,7 @@ import androidx.core.content.edit
 import anki.collection.OpChanges
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.CollectionManager
+import com.ichi2.anki.R
 import com.ichi2.anki.Reviewer
 import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.observability.ChangeManager
@@ -47,8 +49,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
+import java.io.IOException
 import java.lang.ref.WeakReference
 import java.net.URLEncoder
+import java.net.UnknownHostException
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
@@ -140,7 +144,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             try {
                 mutex.withLock {
                     val profile = if (token.isEmpty()) preview(url, user) else upload(url, user, token, resync)
-                    if (profile != null) present(profile, showFeedback)
+                    present(profile, showFeedback)
                 }
             } catch (e: Exception) {
                 Timber.w(e, "ankiquest refresh failed")
@@ -151,11 +155,10 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     private suspend fun preview(
         url: String,
         user: String,
-    ): JSONObject? {
+    ): JSONObject {
         val now = TimeManager.time.intTimeMS()
         if (now - baselineAt > BASELINE_MAX_AGE_MS) {
-            val baseline = get("$url/api/profile/$user") ?: return null
-            syncedLastId = baseline.optLong("last_review_id")
+            syncedLastId = get("$url/api/profile/$user").optLong("last_review_id")
             baselineAt = now
         }
         val body = JSONObject().put("reviews", pendingReviews(syncedLastId))
@@ -173,14 +176,15 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         user: String,
         token: String,
         resync: Boolean,
-    ): JSONObject? {
+        onlyTest: Boolean = false,
+    ): JSONObject {
         val prefs = AnkiDroidApp.sharedPrefs()
         val mark = prefs.getLong(MARK_KEY, 0L)
         var known = if (resync) maxOf(0L, mark - RESYNC_WINDOW_MS) else mark
         val clock = clock()
-        var profile: JSONObject?
+        var profile: JSONObject
         do {
-            val pending = pendingReviews(known)
+            val pending = if (onlyTest) JSONArray() else pendingReviews(known)
             val body =
                 JSONObject()
                     .put("reviews", pending)
@@ -194,7 +198,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                         .header("Authorization", "Bearer $token")
                         .post(body.toString().toRequestBody(json))
                         .build(),
-                ) ?: return null
+                )
             if (pending.length() > 0) {
                 known = pending.getJSONObject(pending.length() - 1).getLong("id")
                 prefs.edit { putLong(MARK_KEY, maxOf(known, mark)) }
@@ -251,16 +255,75 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             rows
         }
 
-    private fun get(url: String): JSONObject? = execute(Request.Builder().url(url).build())
+    private fun get(url: String): JSONObject = execute(Request.Builder().url(url).build())
 
-    private fun execute(request: Request): JSONObject? =
+    private fun execute(request: Request): JSONObject =
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                Timber.w("ankiquest: %s returned %d", request.url.encodedPath, response.code)
-                return null
-            }
+            if (!response.isSuccessful) throw HttpStatusException(response.code)
             JSONObject(response.body.string())
         }
+
+    private class HttpStatusException(
+        val code: Int,
+    ) : IOException("HTTP $code")
+
+    /**
+     * Runs a connection test, or with [uploadAll] resends every review, for the settings screen.
+     *
+     * @return a message describing the outcome, never throws
+     */
+    suspend fun runFromSettings(
+        context: Context,
+        uploadAll: Boolean,
+    ): String = withContext(Dispatchers.IO) { settingsAction(context, uploadAll) }
+
+    private suspend fun settingsAction(
+        context: Context,
+        uploadAll: Boolean,
+    ): String {
+        val (url, user) = endpoint() ?: return context.getString(R.string.ankiquest_check_unconfigured)
+        val token =
+            AnkiDroidApp
+                .sharedPrefs()
+                .getString(TOKEN_KEY, "")
+                .orEmpty()
+                .trim()
+        return try {
+            mutex.withLock {
+                val profile =
+                    if (token.isEmpty()) {
+                        get("$url/api/profile/$user")
+                    } else {
+                        if (uploadAll) AnkiDroidApp.sharedPrefs().edit { remove(MARK_KEY) }
+                        upload(url, user, token, resync = false, onlyTest = !uploadAll)
+                    }
+                present(profile, showFeedback = false)
+                val lifetime = profile.getJSONObject("lifetime")
+                val summary =
+                    context.getString(
+                        R.string.ankiquest_check_ok,
+                        profile.getString("display"),
+                        profile.getInt("level"),
+                        profile.getLong("xp_total"),
+                        lifetime.getLong("reviews"),
+                    )
+                if (token.isEmpty()) summary + "\n\n" + context.getString(R.string.ankiquest_check_no_token) else summary
+            }
+        } catch (e: HttpStatusException) {
+            when (e.code) {
+                401 -> context.getString(R.string.ankiquest_check_unauthorized)
+                404 -> context.getString(R.string.ankiquest_check_unknown_player)
+                else -> context.getString(R.string.ankiquest_check_http, e.code)
+            }
+        } catch (e: UnknownHostException) {
+            context.getString(R.string.ankiquest_check_unreachable, url)
+        } catch (e: IllegalArgumentException) {
+            context.getString(R.string.ankiquest_check_bad_url, url)
+        } catch (e: Exception) {
+            Timber.w(e, "ankiquest settings check failed")
+            context.getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName)
+        }
+    }
 
     private fun snapshotOf(profile: JSONObject): Snapshot {
         val quests = profile.getJSONArray("quests")

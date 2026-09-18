@@ -18,4 +18,12 @@
         android:key="@string/ankiquest_token_key"
         android:title="@string/ankiquest_token_title"
         android:inputType="textPassword" />
+    <Preference
+        android:key="@string/ankiquest_test_key"
+        android:title="@string/ankiquest_test_title"
+        android:summary="@string/ankiquest_test_summary" />
+    <Preference
+        android:key="@string/ankiquest_upload_all_key"
+        android:title="@string/ankiquest_upload_all_title"
+        android:summary="@string/ankiquest_upload_all_summary" />
 </PreferenceScreen>
