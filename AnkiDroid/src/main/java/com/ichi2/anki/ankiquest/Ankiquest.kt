@@ -85,6 +85,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             .build()
     private val json = "application/json".toMediaType()
 
+    private var app: Application? = null
     private var activity = WeakReference<Activity>(null)
     private var syncedLastId = 0L
     private var baselineAt = 0L
@@ -103,22 +104,43 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     )
 
     fun init(app: Application) {
+        this.app = app
         app.registerActivityLifecycleCallbacks(this)
         ChangeManager.subscribe(this, owner = null)
     }
 
+    /** The configured player name, or the sync username when none is set. */
+    fun player(): String? =
+        AnkiDroidApp
+            .sharedPrefs()
+            .getString(USER_KEY, "")
+            .orEmpty()
+            .trim()
+            .ifEmpty { Prefs.username.orEmpty() }
+            .ifEmpty { null }
+
     private fun endpoint(): Pair<String, String>? {
-        val prefs = AnkiDroidApp.sharedPrefs()
-        val url = prefs.getString(URL_KEY, "").orEmpty().trim().trimEnd('/')
-        val user =
-            prefs
-                .getString(USER_KEY, "")
+        val url =
+            AnkiDroidApp
+                .sharedPrefs()
+                .getString(URL_KEY, "")
                 .orEmpty()
                 .trim()
-                .ifEmpty { Prefs.username.orEmpty() }
-        if (url.isEmpty() || user.isEmpty()) return null
+                .trimEnd('/')
+        val user = player()
+        if (url.isEmpty() || user == null) return null
         return url to URLEncoder.encode(user, "UTF-8").replace("+", "%20")
     }
+
+    /** This week's standings, as served by `/api/leaderboard`. */
+    suspend fun leaderboard(): JSONArray =
+        withContext(Dispatchers.IO) {
+            val (url, _) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
+            client.newCall(Request.Builder().url("$url/api/leaderboard").build()).execute().use { response ->
+                if (!response.isSuccessful) throw HttpStatusException(response.code)
+                JSONArray(response.body.string())
+            }
+        }
 
     override fun opExecuted(
         changes: OpChanges,
@@ -214,6 +236,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         val snapshot = snapshotOf(profile)
         val message = previous?.let { describe(it, snapshot) }
         previous = snapshot
+        app?.let { AnkiquestWidget.requestUpdate(it) }
         if (showFeedback && message != null) {
             withContext(Dispatchers.Main) { showBanner(message.first, message.second) }
         }

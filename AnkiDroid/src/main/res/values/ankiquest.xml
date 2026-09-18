@@ -25,6 +25,14 @@
     <string name="ankiquest_check_unreachable" translatable="false">Could not find %1$s. Check the URL and your internet connection.</string>
     <string name="ankiquest_check_bad_url" translatable="false">%1$s is not a valid URL. It should look like https://anki.example.com</string>
     <string name="ankiquest_check_failed" translatable="false">Could not reach the server: %1$s</string>
+    <string name="ankiquest_widget_label" translatable="false">ankiquest leaderboard</string>
+    <string name="ankiquest_widget_description" translatable="false">This week\'s ankiquest leaderboard</string>
+    <string name="ankiquest_widget_title" translatable="false">ankiquest · week XP</string>
+    <string name="ankiquest_widget_title_offline" translatable="false">ankiquest · week XP · offline</string>
+    <string name="ankiquest_widget_level" translatable="false">Lv %1$d</string>
+    <string name="ankiquest_widget_unconfigured" translatable="false">Set up ankiquest in Settings</string>
+    <string name="ankiquest_widget_empty" translatable="false">Nobody has uploaded reviews yet</string>
+    <string name="ankiquest_widget_offline" translatable="false">Could not reach the ankiquest server</string>
     <string name="ankiquest_update_title" translatable="false">%1$s available</string>
     <string name="ankiquest_update_message" translatable="false">A new AnkiDroid Quest build is ready (%1$d MB). Your collection is kept.</string>
     <string name="ankiquest_update_install" translatable="false">Update</string>

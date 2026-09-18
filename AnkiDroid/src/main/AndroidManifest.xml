@@ -542,6 +542,18 @@
             android:name="com.ichi2.anki.receiver.CopyToClipboardReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name="com.ichi2.anki.ankiquest.AnkiquestWidget"
+            android:label="@string/ankiquest_widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_provider_ankiquest" />
+        </receiver>
+
         <!-- "Add Note" widget -->
         <receiver
             android:name="com.ichi2.widget.AddNoteWidget"
