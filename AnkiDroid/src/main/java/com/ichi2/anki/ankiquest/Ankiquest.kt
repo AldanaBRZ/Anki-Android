@@ -28,6 +28,7 @@ import anki.collection.OpChanges
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.CollectionManager
 import com.ichi2.anki.Reviewer
+import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.observability.ChangeManager
 import com.ichi2.anki.settings.Prefs
 import com.ichi2.anki.ui.windows.reviewer.ReviewerViewModel
@@ -128,7 +129,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         url: String,
         user: String,
     ) {
-        val now = System.currentTimeMillis()
+        val now = TimeManager.time.intTimeMS()
         if (now - baselineAt > BASELINE_MAX_AGE_MS) {
             val baseline = get("$url/api/profile/$user") ?: return
             syncedLastId = baseline.optLong("last_review_id")
