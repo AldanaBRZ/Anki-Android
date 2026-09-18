@@ -2,6 +2,7 @@
 <resources>
     <string name="ankiquest_screen_key" translatable="false">ankiquestScreen</string>
     <string name="ankiquest_screen_title" translatable="false" maxLength="41">ankiquest</string>
+    <string name="ankiquest_menu_title" translatable="false" maxLength="28">ankiquest</string>
     <string name="ankiquest_url_key" translatable="false">ankiquestUrl</string>
     <string name="ankiquest_user_key" translatable="false">ankiquestUser</string>
     <string name="ankiquest_token_key" translatable="false">ankiquestToken</string>

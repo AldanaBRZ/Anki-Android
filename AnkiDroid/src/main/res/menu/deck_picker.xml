@@ -21,7 +21,7 @@
     <item
         android:id="@+id/action_ankiquest"
         android:icon="@drawable/ic_cards_star"
-        android:title="@string/ankiquest_screen_title"
+        android:title="@string/ankiquest_menu_title"
         ankidroid:showAsAction="ifRoom"/>
     <item
         android:id="@+id/action_undo"
