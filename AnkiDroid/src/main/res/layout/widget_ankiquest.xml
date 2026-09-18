@@ -50,8 +50,7 @@
             android:layout_marginStart="2dp"
             android:contentDescription="@string/ankiquest_widget_refresh"
             android:padding="7dp"
-            android:src="@drawable/ic_refresh_white"
-            android:tint="@color/ankiquest_widget_text_dim" />
+            android:src="@drawable/ankiquest_widget_refresh" />
     </LinearLayout>
 
     <TextView

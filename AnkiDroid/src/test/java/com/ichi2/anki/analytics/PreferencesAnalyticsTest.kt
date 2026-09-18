@@ -95,6 +95,16 @@ class PreferencesAnalyticsTest : RobolectricTest() {
             R.string.pref_allow_dangerous_js_api, // allow_dangerous_js_api
             // Security-sensitive settings (GHSL-2026-085)
             R.string.pref_allow_card_external_launch_key, // allowCardExternalLaunch
+            // ankiquest: server, player and token are personal, the rest are actions or screens
+            R.string.ankiquest_screen_key,
+            R.string.ankiquest_url_key,
+            R.string.ankiquest_user_key,
+            R.string.ankiquest_token_key,
+            R.string.ankiquest_test_key,
+            R.string.ankiquest_upload_all_key,
+            R.string.ankiquest_check_updates_key,
+            R.string.ankiquest_notify_rank_key,
+            R.string.ankiquest_streak_hours_key,
         ).toStringResourceSet()
 
     @Test
