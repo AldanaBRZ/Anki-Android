@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="ankiquest_url_title" translatable="false">ankiquest server URL</string>
-    <string name="ankiquest_user_title" translatable="false">ankiquest player (defaults to the sync username)</string>
+    <string name="ankiquest_url_key" translatable="false">ankiquestUrl</string>
+    <string name="ankiquest_user_key" translatable="false">ankiquestUser</string>
+    <string name="ankiquest_url_title" translatable="false" maxLength="41">ankiquest server URL</string>
+    <string name="ankiquest_user_title" translatable="false" maxLength="41">ankiquest player</string>
 </resources>
