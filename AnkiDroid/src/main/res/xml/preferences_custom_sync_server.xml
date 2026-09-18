@@ -23,4 +23,15 @@
         android:title="@string/custom_sync_certificate_title"
         android:inputType="textMultiLine"
         app:dialogHint="@string/dialog_hint_certificate" />
+    <com.ichi2.preferences.VersatileTextPreference
+        android:key="ankiquestUrl"
+        android:title="@string/ankiquest_url_title"
+        android:inputType="textUri"
+        app:dialogHint="@string/dialog_hint_url"
+        app:useSimpleSummaryProvider="true" />
+    <com.ichi2.preferences.VersatileTextPreference
+        android:key="ankiquestUser"
+        android:title="@string/ankiquest_user_title"
+        android:inputType="text"
+        app:useSimpleSummaryProvider="true" />
 </PreferenceScreen>

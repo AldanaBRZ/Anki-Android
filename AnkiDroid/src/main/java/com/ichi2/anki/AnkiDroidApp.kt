@@ -24,6 +24,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import anki.collection.OpChanges
 import com.ichi2.anki.AnkiDroidApp.Companion.sharedPreferencesTestingOverride
 import com.ichi2.anki.analytics.initializeAnalytics
+import com.ichi2.anki.ankiquest.Ankiquest
 import com.ichi2.anki.browser.SharedPreferencesLastDeckIdRepository
 import com.ichi2.anki.common.android.AdaptionUtil
 import com.ichi2.anki.common.android.Animations
@@ -195,6 +196,7 @@ open class AnkiDroidApp :
         restoreRecurringAlarms(this, RECURRING_WIDGETS)
 
         setupLifecycleLogging()
+        Ankiquest.init(this)
         activityAgnosticDialogs = ActivityAgnosticDialogs.register(this)
         setupTextToSpeech()
         setupCustomFieldFilters()

@@ -1,0 +1,310 @@
+/*
+ *  This program is free software; you can redistribute it and/or modify it under
+ *  the terms of the GNU General Public License as published by the Free Software
+ *  Foundation; either version 3 of the License, or (at your option) any later
+ *  version.
+ *
+ *  This program is distributed in the hope that it will be useful, but WITHOUT ANY
+ *  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ *  PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License along with
+ *  this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package com.ichi2.anki.ankiquest
+
+import android.app.Activity
+import android.app.Application
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.TextView
+import anki.collection.OpChanges
+import com.ichi2.anki.AnkiDroidApp
+import com.ichi2.anki.CollectionManager
+import com.ichi2.anki.Reviewer
+import com.ichi2.anki.observability.ChangeManager
+import com.ichi2.anki.settings.Prefs
+import com.ichi2.anki.ui.windows.reviewer.ReviewerViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import timber.log.Timber
+import java.lang.ref.WeakReference
+import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
+
+/**
+ * Shows XP, combo, quest and level feedback from an ankiquest server after each answer.
+ *
+ * Reviews which have not been synced yet are sent to the server's preview endpoint, which
+ * returns the profile as it will look after the next sync. Nothing is stored server-side.
+ */
+object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallbacks {
+    const val URL_KEY = "ankiquestUrl"
+    const val USER_KEY = "ankiquestUser"
+
+    private const val MAX_PENDING = 5000
+    private const val BASELINE_MAX_AGE_MS = 10 * 60 * 1000L
+    private const val BANNER_MS = 1800L
+    private const val BANNER_LONG_MS = 3500L
+    private const val BANNER_TAG = "ankiquest_banner"
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutex = Mutex()
+    private val client =
+        OkHttpClient
+            .Builder()
+            .callTimeout(4, TimeUnit.SECONDS)
+            .build()
+    private val json = "application/json".toMediaType()
+
+    private var activity = WeakReference<Activity>(null)
+    private var syncedLastId = 0L
+    private var baselineAt = 0L
+    private var previous: Snapshot? = null
+
+    private data class Snapshot(
+        val xp: Long,
+        val level: Int,
+        val intoLevel: Long,
+        val forNext: Long,
+        val streak: Int,
+        val combo: Int,
+        val doneQuests: Set<String>,
+        val achievements: Set<String>,
+    )
+
+    fun init(app: Application) {
+        app.registerActivityLifecycleCallbacks(this)
+        ChangeManager.subscribe(this, owner = null)
+    }
+
+    private fun endpoint(): Pair<String, String>? {
+        val prefs = AnkiDroidApp.sharedPrefs()
+        val url = prefs.getString(URL_KEY, "").orEmpty().trim().trimEnd('/')
+        val user =
+            prefs
+                .getString(USER_KEY, "")
+                .orEmpty()
+                .trim()
+                .ifEmpty { Prefs.username.orEmpty() }
+        if (url.isEmpty() || user.isEmpty()) return null
+        return url to URLEncoder.encode(user, "UTF-8").replace("+", "%20")
+    }
+
+    override fun opExecuted(
+        changes: OpChanges,
+        handler: Any?,
+    ) {
+        if (!changes.studyQueues) return
+        if (handler !is Reviewer && handler !is ReviewerViewModel) return
+        val (url, user) = endpoint() ?: return
+        scope.launch {
+            try {
+                mutex.withLock { refresh(url, user) }
+            } catch (e: Exception) {
+                Timber.w(e, "ankiquest refresh failed")
+            }
+        }
+    }
+
+    private suspend fun refresh(
+        url: String,
+        user: String,
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - baselineAt > BASELINE_MAX_AGE_MS) {
+            val baseline = get("$url/api/profile/$user") ?: return
+            syncedLastId = baseline.optLong("last_review_id")
+            baselineAt = now
+        }
+        val pending = pendingReviews(syncedLastId)
+        val body = JSONObject().put("reviews", pending).toString().toRequestBody(json)
+        val profile =
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/preview/$user")
+                    .post(body)
+                    .build(),
+            ) ?: return
+        val snapshot = snapshotOf(profile)
+        val message = previous?.let { describe(it, snapshot) }
+        previous = snapshot
+        if (message != null) {
+            withContext(Dispatchers.Main) { showBanner(message.first, message.second) }
+        }
+    }
+
+    private suspend fun pendingReviews(afterId: Long): JSONArray =
+        CollectionManager.withCol {
+            val rows = JSONArray()
+            db
+                .query(
+                    "select id, cid, lastIvl, time, type from revlog " +
+                        "where id > ? and ease > 0 and type < 4 order by id desc limit $MAX_PENDING",
+                    afterId,
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        rows.put(
+                            JSONObject()
+                                .put("id", cursor.getLong(0))
+                                .put("cid", cursor.getLong(1))
+                                .put("last_ivl", cursor.getLong(2))
+                                .put("time_ms", cursor.getLong(3))
+                                .put("kind", cursor.getInt(4)),
+                        )
+                    }
+                }
+            rows
+        }
+
+    private fun get(url: String): JSONObject? = execute(Request.Builder().url(url).build())
+
+    private fun execute(request: Request): JSONObject? =
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                Timber.w("ankiquest: %s returned %d", request.url.encodedPath, response.code)
+                return null
+            }
+            JSONObject(response.body.string())
+        }
+
+    private fun snapshotOf(profile: JSONObject): Snapshot {
+        val quests = profile.getJSONArray("quests")
+        val achievements = profile.getJSONArray("achievements")
+        return Snapshot(
+            xp = profile.getLong("xp_total"),
+            level = profile.getInt("level"),
+            intoLevel = profile.getLong("xp_into_level"),
+            forNext = profile.getLong("xp_for_next"),
+            streak = profile.getInt("streak"),
+            combo = profile.getJSONObject("today").getInt("current_combo"),
+            doneQuests =
+                (0 until quests.length())
+                    .map { quests.getJSONObject(it) }
+                    .filter { it.getBoolean("done") }
+                    .map { it.getString("title") }
+                    .toSet(),
+            achievements =
+                (0 until achievements.length())
+                    .map { achievements.getJSONObject(it) }
+                    .filter { !it.isNull("unlocked") }
+                    .map { it.getString("title") }
+                    .toSet(),
+        )
+    }
+
+    private fun describe(
+        before: Snapshot,
+        after: Snapshot,
+    ): Pair<String, Boolean>? {
+        val gained = after.xp - before.xp
+        if (gained <= 0) return null
+        val headlines = mutableListOf<String>()
+        if (after.level > before.level) headlines += "Level ${after.level}!"
+        (after.achievements - before.achievements).forEach { headlines += "Achievement: $it" }
+        (after.doneQuests - before.doneQuests).forEach { headlines += "Quest complete: $it" }
+        if (after.streak > before.streak) headlines += "${after.streak} day streak"
+
+        val status =
+            buildString {
+                append("+$gained XP")
+                if (after.combo >= 5) append("  ·  combo ${after.combo}")
+                append("  ·  Lv ${after.level}  ${after.intoLevel}/${after.forNext}")
+            }
+        return if (headlines.isEmpty()) {
+            status to false
+        } else {
+            (headlines.joinToString("\n") + "\n" + status) to true
+        }
+    }
+
+    private fun showBanner(
+        text: String,
+        important: Boolean,
+    ) {
+        val host = activity.get() ?: return
+        if (host.isFinishing || host.isDestroyed) return
+        val root = host.findViewById<FrameLayout>(android.R.id.content) ?: return
+        val density = host.resources.displayMetrics.density
+        val banner =
+            root.findViewWithTag<TextView>(BANNER_TAG) ?: TextView(host).apply {
+                tag = BANNER_TAG
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER
+                isClickable = false
+                isFocusable = false
+                importantForAccessibility = TextView.IMPORTANT_FOR_ACCESSIBILITY_NO
+                val pad = (10 * density).toInt()
+                setPadding(pad * 2, pad, pad * 2, pad)
+                elevation = 8 * density
+                root.addView(
+                    this,
+                    FrameLayout
+                        .LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+                        ).apply { topMargin = (72 * density).toInt() },
+                )
+            }
+        banner.background =
+            GradientDrawable().apply {
+                cornerRadius = 20 * density
+                setColor(if (important) 0xF0B8860B.toInt() else 0xE0202830.toInt())
+            }
+        banner.text = text
+        banner.animate().cancel()
+        banner.alpha = 1f
+        banner.bringToFront()
+        banner
+            .animate()
+            .alpha(0f)
+            .setStartDelay(if (important) BANNER_LONG_MS else BANNER_MS)
+            .setDuration(400)
+            .start()
+    }
+
+    override fun onActivityResumed(activity: Activity) {
+        this.activity = WeakReference(activity)
+    }
+
+    override fun onActivityPaused(activity: Activity) {
+        if (this.activity.get() === activity) this.activity.clear()
+    }
+
+    override fun onActivityCreated(
+        activity: Activity,
+        savedInstanceState: Bundle?,
+    ) {}
+
+    override fun onActivityStarted(activity: Activity) {}
+
+    override fun onActivityStopped(activity: Activity) {}
+
+    override fun onActivitySaveInstanceState(
+        activity: Activity,
+        outState: Bundle,
+    ) {}
+
+    override fun onActivityDestroyed(activity: Activity) {}
+}
