@@ -13,9 +13,17 @@
  */
 package com.ichi2.anki.preferences
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.ListPreference
 import androidx.preference.Preference
+import androidx.preference.SwitchPreferenceCompat
 import com.ichi2.anki.R
 import com.ichi2.anki.ankiquest.Ankiquest
 import com.ichi2.anki.ankiquest.AnkiquestUpdater
@@ -28,12 +36,21 @@ class AnkiquestSettingsFragment : SettingsFragment() {
     override val analyticsScreenNameConstant = "prefs.ankiquest"
 
     private var running = false
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun initSubscreen() {
         requirePreference<VersatileTextPreference>(R.string.ankiquest_url_key).continuousValidator =
             VersatileTextPreference.Validator { value ->
                 if (value.isNotEmpty()) value.toHttpUrl()
             }
+        requirePreference<SwitchPreferenceCompat>(R.string.ankiquest_notify_rank_key).setOnPreferenceChangeListener { _, enabled ->
+            if (enabled == true) askForNotifications()
+            true
+        }
+        requirePreference<ListPreference>(R.string.ankiquest_streak_hours_key).setOnPreferenceChangeListener { _, hours ->
+            if (hours != "0") askForNotifications()
+            true
+        }
         bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
         bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
         requirePreference<Preference>(R.string.ankiquest_check_updates_key).summary =
@@ -73,5 +90,26 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             }
             true
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val prefs = preferenceManager.sharedPreferences ?: return
+        if (!prefs.getBoolean(ASKED_KEY, false)) {
+            prefs.edit { putBoolean(ASKED_KEY, true) }
+            askForNotifications()
+        }
+    }
+
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted =
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+        if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    companion object {
+        private const val ASKED_KEY = "ankiquestAskedNotifications"
     }
 }

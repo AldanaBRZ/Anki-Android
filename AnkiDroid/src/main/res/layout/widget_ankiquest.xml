@@ -5,23 +5,62 @@
     android:layout_height="match_parent"
     android:background="@drawable/ankiquest_widget_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="10dp">
 
-    <TextView
-        android:id="@+id/ankiquest_widget_header"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="4dp"
-        android:text="@string/ankiquest_widget_title"
-        android:textColor="#8B949C"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/ankiquest_screen_title"
+            android:textColor="@color/ankiquest_widget_text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:text="@string/ankiquest_widget_this_week"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/ankiquest_widget_updated"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="11sp" />
+
+        <ImageView
+            android:id="@+id/ankiquest_widget_refresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="2dp"
+            android:contentDescription="@string/ankiquest_widget_refresh"
+            android:padding="7dp"
+            android:src="@drawable/ic_refresh_white"
+            android:tint="@color/ankiquest_widget_text_dim" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/ankiquest_widget_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textColor="#E8E6E1"
+        android:paddingStart="4dp"
+        android:paddingTop="6dp"
+        android:textColor="@color/ankiquest_widget_text"
         android:textSize="13sp"
         android:visibility="gone" />
 
@@ -29,59 +68,429 @@
         android:id="@+id/ankiquest_widget_row_0"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
+        android:paddingStart="4dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
         android:visibility="gone">
-        <TextView android:id="@+id/ankiquest_widget_name_0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:singleLine="true" android:textColor="#E8E6E1" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_level_0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="8dp" android:textColor="#F0B840" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_xp_0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:minWidth="64dp" android:paddingStart="8dp" android:textColor="#5AA5F0" android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/ankiquest_widget_rank_0"
+            android:layout_width="30dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_name_0"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:singleLine="true"
+                    android:textColor="@color/ankiquest_widget_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_streak_0"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/ankiquest_widget_text_dim"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_level_0"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/ankiquest_widget_gold"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/ankiquest_widget_bar_0"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="4dp"
+                android:max="1000"
+                android:maxHeight="4dp"
+                android:minHeight="4dp"
+                android:progressDrawable="@drawable/ankiquest_widget_bar" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ankiquest_widget_xp_0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="end"
+            android:minWidth="56dp"
+            android:textColor="@color/ankiquest_widget_accent"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/ankiquest_widget_row_1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
+        android:paddingStart="4dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
         android:visibility="gone">
-        <TextView android:id="@+id/ankiquest_widget_name_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:singleLine="true" android:textColor="#E8E6E1" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_level_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="8dp" android:textColor="#F0B840" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_xp_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:minWidth="64dp" android:paddingStart="8dp" android:textColor="#5AA5F0" android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/ankiquest_widget_rank_1"
+            android:layout_width="30dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_name_1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:singleLine="true"
+                    android:textColor="@color/ankiquest_widget_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_streak_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/ankiquest_widget_text_dim"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_level_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/ankiquest_widget_gold"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/ankiquest_widget_bar_1"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="4dp"
+                android:max="1000"
+                android:maxHeight="4dp"
+                android:minHeight="4dp"
+                android:progressDrawable="@drawable/ankiquest_widget_bar" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ankiquest_widget_xp_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="end"
+            android:minWidth="56dp"
+            android:textColor="@color/ankiquest_widget_accent"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/ankiquest_widget_row_2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
+        android:paddingStart="4dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
         android:visibility="gone">
-        <TextView android:id="@+id/ankiquest_widget_name_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:singleLine="true" android:textColor="#E8E6E1" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_level_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="8dp" android:textColor="#F0B840" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_xp_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:minWidth="64dp" android:paddingStart="8dp" android:textColor="#5AA5F0" android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/ankiquest_widget_rank_2"
+            android:layout_width="30dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_name_2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:singleLine="true"
+                    android:textColor="@color/ankiquest_widget_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_streak_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/ankiquest_widget_text_dim"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_level_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/ankiquest_widget_gold"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/ankiquest_widget_bar_2"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="4dp"
+                android:max="1000"
+                android:maxHeight="4dp"
+                android:minHeight="4dp"
+                android:progressDrawable="@drawable/ankiquest_widget_bar" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ankiquest_widget_xp_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="end"
+            android:minWidth="56dp"
+            android:textColor="@color/ankiquest_widget_accent"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/ankiquest_widget_row_3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
+        android:paddingStart="4dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
         android:visibility="gone">
-        <TextView android:id="@+id/ankiquest_widget_name_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:singleLine="true" android:textColor="#E8E6E1" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_level_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="8dp" android:textColor="#F0B840" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_xp_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:minWidth="64dp" android:paddingStart="8dp" android:textColor="#5AA5F0" android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/ankiquest_widget_rank_3"
+            android:layout_width="30dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_name_3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:singleLine="true"
+                    android:textColor="@color/ankiquest_widget_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_streak_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/ankiquest_widget_text_dim"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_level_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/ankiquest_widget_gold"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/ankiquest_widget_bar_3"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="4dp"
+                android:max="1000"
+                android:maxHeight="4dp"
+                android:minHeight="4dp"
+                android:progressDrawable="@drawable/ankiquest_widget_bar" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ankiquest_widget_xp_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="end"
+            android:minWidth="56dp"
+            android:textColor="@color/ankiquest_widget_accent"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/ankiquest_widget_row_4"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
+        android:paddingStart="4dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
         android:visibility="gone">
-        <TextView android:id="@+id/ankiquest_widget_name_4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:singleLine="true" android:textColor="#E8E6E1" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_level_4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="8dp" android:textColor="#F0B840" android:textSize="14sp" />
-        <TextView android:id="@+id/ankiquest_widget_xp_4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:minWidth="64dp" android:paddingStart="8dp" android:textColor="#5AA5F0" android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/ankiquest_widget_rank_4"
+            android:layout_width="30dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/ankiquest_widget_text_dim"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_name_4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:singleLine="true"
+                    android:textColor="@color/ankiquest_widget_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_streak_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/ankiquest_widget_text_dim"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/ankiquest_widget_level_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/ankiquest_widget_gold"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/ankiquest_widget_bar_4"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="4dp"
+                android:max="1000"
+                android:maxHeight="4dp"
+                android:minHeight="4dp"
+                android:progressDrawable="@drawable/ankiquest_widget_bar" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ankiquest_widget_xp_4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="end"
+            android:minWidth="56dp"
+            android:textColor="@color/ankiquest_widget_accent"
+            android:textSize="14sp" />
     </LinearLayout>
 </LinearLayout>

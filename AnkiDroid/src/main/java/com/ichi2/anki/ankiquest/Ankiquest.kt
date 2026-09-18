@@ -112,7 +112,15 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         this.app = app
         app.registerActivityLifecycleCallbacks(this)
         ChangeManager.subscribe(this, owner = null)
+        AnkiquestPoll.schedule(app)
     }
+
+    /** The player's profile, as served by `/api/profile/<user>`. */
+    suspend fun profile(): JSONObject =
+        withContext(Dispatchers.IO) {
+            val (url, user) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
+            get("$url/api/profile/$user")
+        }
 
     /** The configured player name, or the sync username when none is set. */
     fun player(): String? =
@@ -291,6 +299,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         return JSONObject()
             .put("rollover_hour", rollover)
             .put("offset_west_min", -TimeZone.getDefault().getOffset(now) / 60_000)
+            .also { AnkiDroidApp.sharedPrefs().edit { putInt(AnkiquestNotifier.ROLLOVER_KEY, rollover) } }
     }
 
     private suspend fun pendingReviews(afterId: Long): JSONArray =
