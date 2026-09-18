@@ -132,17 +132,15 @@ class ReviewerFragment :
 
     override fun onStart() {
         super.onStart()
-        if (!requireActivity().isChangingConfigurations) {
-            shakeDetector?.start()
-        }
+        shakeDetector?.start()
     }
 
     override fun onStop() {
         super.onStop()
         if (!requireActivity().isChangingConfigurations) {
             viewModel.stopAutoAdvance()
-            shakeDetector?.stop()
         }
+        shakeDetector?.stop()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -360,7 +358,6 @@ class ReviewerFragment :
         }
         if (bindingMap.isBound(Gesture.SHAKE)) {
             shakeDetector = AnkiShakeDetector.createInstance(requireContext(), this)
-            shakeDetector?.start()
         }
     }
 
