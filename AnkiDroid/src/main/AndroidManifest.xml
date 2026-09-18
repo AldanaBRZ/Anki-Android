@@ -29,6 +29,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage"/>
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Necessary for recording audio in a WebView -->
@@ -402,6 +403,11 @@
         <activity
             android:name="com.ichi2.anki.Info"
             android:label="@string/pref_cat_about_title"
+            android:exported="false"
+            />
+        <activity
+            android:name="com.ichi2.anki.ankiquest.AnkiquestActivity"
+            android:label="@string/ankiquest_screen_title"
             android:exported="false"
             />
 

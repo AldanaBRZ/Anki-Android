@@ -90,6 +90,7 @@ android {
         buildConfigField "long", "BUILD_TIME", buildTimeMillis.get()
         // whether UI elements linking to external donation pages are shown ('play' hides them)
         buildConfigField "Boolean", "SHOW_DONATE_LINKS", "true"
+        buildConfigField "int", "ANKIQUEST_RELEASE", (project.findProperty("ankiquestRelease") ?: "0").toString()
         resValue "string", "app_name", "AnkiDroid"
 
         // The version number is of the form:

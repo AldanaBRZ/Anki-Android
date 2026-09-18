@@ -19,6 +19,11 @@
         ankidroid:actionProviderClass="com.ichi2.anki.SyncActionProvider"
         ankidroid:showAsAction="always"/>
     <item
+        android:id="@+id/action_ankiquest"
+        android:icon="@drawable/ic_cards_star"
+        android:title="@string/ankiquest_screen_title"
+        ankidroid:showAsAction="ifRoom"/>
+    <item
         android:id="@+id/action_undo"
         ankidroid:showAsAction="never"
         android:visible="false"

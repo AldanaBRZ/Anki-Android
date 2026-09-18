@@ -8,4 +8,10 @@
     <string name="ankiquest_url_title" translatable="false" maxLength="41">ankiquest server URL</string>
     <string name="ankiquest_user_title" translatable="false" maxLength="41">ankiquest player</string>
     <string name="ankiquest_token_title" translatable="false" maxLength="41">ankiquest token</string>
+    <string name="ankiquest_update_title" translatable="false">%1$s available</string>
+    <string name="ankiquest_update_message" translatable="false">A new AnkiDroid Quest build is ready (%1$d MB). Your collection is kept.</string>
+    <string name="ankiquest_update_install" translatable="false">Update</string>
+    <string name="ankiquest_update_later" translatable="false">Later</string>
+    <string name="ankiquest_update_downloading" translatable="false">Downloading… %1$d%%</string>
+    <string name="ankiquest_update_failed" translatable="false">The update could not be downloaded. It will be offered again later.</string>
 </resources>

@@ -360,8 +360,11 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             .start()
     }
 
+    fun dashboardUrl(): String? = endpoint()?.let { (url, user) -> "$url/#$user" }
+
     override fun onActivityResumed(activity: Activity) {
         this.activity = WeakReference(activity)
+        AnkiquestUpdater.maybeCheck(activity)
         val now = TimeManager.time.intTimeMS()
         if (now - resumeUploadAt > RESUME_UPLOAD_INTERVAL_MS) {
             resumeUploadAt = now

@@ -94,6 +94,7 @@ import com.ichi2.anki.android.back.exitViaDoubleTapBackCallback
 import com.ichi2.anki.android.input.ShortcutGroup
 import com.ichi2.anki.android.input.shortcut
 import com.ichi2.anki.android.view.locationInWindow
+import com.ichi2.anki.ankiquest.AnkiquestActivity
 import com.ichi2.anki.common.android.AdaptionUtil
 import com.ichi2.anki.common.android.animationDisabled
 import com.ichi2.anki.common.android.appContext
@@ -1386,6 +1387,10 @@ open class DeckPicker :
                 } else {
                     sync()
                 }
+                return true
+            }
+            R.id.action_ankiquest -> {
+                startActivity(Intent(this, AnkiquestActivity::class.java))
                 return true
             }
             R.id.action_import -> {
