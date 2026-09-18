@@ -24,6 +24,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.core.content.edit
 import anki.collection.OpChanges
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.CollectionManager
@@ -61,10 +62,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     const val URL_KEY = "ankiquestUrl"
     const val USER_KEY = "ankiquestUser"
     const val TOKEN_KEY = "ankiquestToken"
+    private const val MARK_KEY = "ankiquestUploadedThrough"
 
     private const val MAX_PENDING = 5000
     private const val BASELINE_MAX_AGE_MS = 10 * 60 * 1000L
     private const val RESUME_UPLOAD_INTERVAL_MS = 60 * 1000L
+    private const val RESYNC_WINDOW_MS = 7 * 24 * 60 * 60 * 1000L
     private const val BANNER_MS = 1800L
     private const val BANNER_LONG_MS = 3500L
     private const val BANNER_TAG = "ankiquest_banner"
@@ -122,7 +125,10 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         launchRefresh(showFeedback = true)
     }
 
-    private fun launchRefresh(showFeedback: Boolean) {
+    private fun launchRefresh(
+        showFeedback: Boolean,
+        resync: Boolean = false,
+    ) {
         val (url, user) = endpoint() ?: return
         val token =
             AnkiDroidApp
@@ -133,7 +139,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         scope.launch {
             try {
                 mutex.withLock {
-                    val profile = if (token.isEmpty()) preview(url, user) else upload(url, user, token)
+                    val profile = if (token.isEmpty()) preview(url, user) else upload(url, user, token, resync)
                     if (profile != null) present(profile, showFeedback)
                 }
             } catch (e: Exception) {
@@ -166,20 +172,20 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         url: String,
         user: String,
         token: String,
+        resync: Boolean,
     ): JSONObject? {
-        if (baselineAt == 0L) {
-            syncedLastId = get("$url/api/profile/$user")?.optLong("last_review_id") ?: 0L
-            baselineAt = TimeManager.time.intTimeMS()
-        }
+        val prefs = AnkiDroidApp.sharedPrefs()
+        val mark = prefs.getLong(MARK_KEY, 0L)
+        var known = if (resync) maxOf(0L, mark - RESYNC_WINDOW_MS) else mark
         val clock = clock()
         var profile: JSONObject?
         do {
-            val pending = pendingReviews(syncedLastId)
+            val pending = pendingReviews(known)
             val body =
                 JSONObject()
                     .put("reviews", pending)
                     .put("clock", clock)
-                    .put("silent", syncedLastId == 0L || pending.length() == MAX_PENDING)
+                    .put("silent", mark == 0L || pending.length() == MAX_PENDING)
             profile =
                 execute(
                     Request
@@ -189,7 +195,10 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                         .post(body.toString().toRequestBody(json))
                         .build(),
                 ) ?: return null
-            syncedLastId = maxOf(syncedLastId, profile.optLong("last_review_id"))
+            if (pending.length() > 0) {
+                known = pending.getJSONObject(pending.length() - 1).getLong("id")
+                prefs.edit { putLong(MARK_KEY, maxOf(known, mark)) }
+            }
         } while (pending.length() == MAX_PENDING)
         return profile
     }
@@ -356,7 +365,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         val now = TimeManager.time.intTimeMS()
         if (now - resumeUploadAt > RESUME_UPLOAD_INTERVAL_MS) {
             resumeUploadAt = now
-            launchRefresh(showFeedback = false)
+            launchRefresh(showFeedback = false, resync = true)
         }
     }
 
