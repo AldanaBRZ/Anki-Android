@@ -17,6 +17,7 @@ package com.ichi2.anki.ankiquest
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -26,6 +27,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.edit
+import androidx.fragment.app.FragmentActivity
 import anki.collection.OpChanges
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.CollectionManager
@@ -34,6 +36,7 @@ import com.ichi2.anki.Reviewer
 import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.observability.ChangeManager
 import com.ichi2.anki.settings.Prefs
+import com.ichi2.anki.ui.windows.reviewer.ReviewerFragment
 import com.ichi2.anki.ui.windows.reviewer.ReviewerViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,11 +70,13 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     const val USER_KEY = "ankiquestUser"
     const val TOKEN_KEY = "ankiquestToken"
     private const val MARK_KEY = "ankiquestUploadedThrough"
+    private const val RECENT_KEY = "ankiquestRecentUploads"
 
     private const val MAX_PENDING = 5000
     private const val BASELINE_MAX_AGE_MS = 10 * 60 * 1000L
     private const val RESUME_UPLOAD_INTERVAL_MS = 60 * 1000L
     private const val RESYNC_WINDOW_MS = 7 * 24 * 60 * 60 * 1000L
+    private const val UNDO_WINDOW_MS = 2 * 24 * 60 * 60 * 1000L
     private const val BANNER_MS = 1800L
     private const val BANNER_LONG_MS = 3500L
     private const val BANNER_TAG = "ankiquest_banner"
@@ -147,9 +152,14 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         handler: Any?,
     ) {
         if (!changes.studyQueues) return
-        if (handler !is Reviewer && handler !is ReviewerViewModel) return
-        launchRefresh(showFeedback = true)
+        val reviewing = handler is Reviewer || handler is ReviewerViewModel || isReviewing(activity.get())
+        if (!reviewing && handler != null) return
+        launchRefresh(showFeedback = reviewing)
     }
+
+    private fun isReviewing(host: Activity?): Boolean =
+        host is Reviewer ||
+            (host as? FragmentActivity)?.supportFragmentManager?.fragments?.any { it is ReviewerFragment } == true
 
     private fun launchRefresh(
         showFeedback: Boolean,
@@ -204,14 +214,29 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         val mark = prefs.getLong(MARK_KEY, 0L)
         var known = if (resync) maxOf(0L, mark - RESYNC_WINDOW_MS) else mark
         val clock = clock()
+
+        val windowStart = TimeManager.time.intTimeMS() - UNDO_WINDOW_MS
+        val recent = recentUploads(prefs, windowStart)
+        val window = if (onlyTest) emptyList() else pendingReviews(windowStart).objects()
+        val present = window.map { it.getLong("id") }.toSet()
+        val deleted = if (onlyTest || mark == 0L) emptySet() else recent - present
+        val restored = window.filter { it.getLong("id") <= known && it.getLong("id") !in recent }
+
         var profile: JSONObject
+        var first = true
         do {
-            val pending = if (onlyTest) JSONArray() else pendingReviews(known)
+            val batch = if (onlyTest) JSONArray() else pendingReviews(known)
+            val full = batch.length() == MAX_PENDING
+            if (batch.length() > 0) known = batch.getJSONObject(batch.length() - 1).getLong("id")
             val body =
                 JSONObject()
-                    .put("reviews", pending)
                     .put("clock", clock)
-                    .put("silent", mark == 0L || pending.length() == MAX_PENDING)
+                    .put("silent", mark == 0L || full)
+            if (first) {
+                restored.forEach { batch.put(it) }
+                body.put("deleted", JSONArray(deleted.toList()))
+            }
+            body.put("reviews", batch)
             profile =
                 execute(
                     Request
@@ -221,13 +246,26 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                         .post(body.toString().toRequestBody(json))
                         .build(),
                 )
-            if (pending.length() > 0) {
-                known = pending.getJSONObject(pending.length() - 1).getLong("id")
-                prefs.edit { putLong(MARK_KEY, maxOf(known, mark)) }
-            }
-        } while (pending.length() == MAX_PENDING)
+            prefs.edit { putLong(MARK_KEY, maxOf(known, mark)) }
+            first = false
+        } while (full)
+        if (!onlyTest) prefs.edit { putString(RECENT_KEY, present.joinToString(",")) }
         return profile
     }
+
+    private fun recentUploads(
+        prefs: SharedPreferences,
+        windowStart: Long,
+    ): Set<Long> =
+        prefs
+            .getString(RECENT_KEY, "")
+            .orEmpty()
+            .split(',')
+            .mapNotNull { it.toLongOrNull() }
+            .filter { it > windowStart }
+            .toSet()
+
+    private fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
 
     private suspend fun present(
         profile: JSONObject,
@@ -378,7 +416,16 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         after: Snapshot,
     ): Pair<String, Boolean>? {
         val gained = after.xp - before.xp
-        if (gained <= 0) return null
+        if (gained == 0L) return null
+        if (gained < 0) {
+            val undone =
+                buildString {
+                    append("−${-gained} XP")
+                    append("  ·  combo ${after.combo}")
+                    append("  ·  Lv ${after.level}  ${after.intoLevel}/${after.forNext}")
+                }
+            return undone to false
+        }
         val headlines = mutableListOf<String>()
         if (after.level > before.level) headlines += "Level ${after.level}!"
         (after.achievements - before.achievements).forEach { headlines += "Achievement: $it" }
