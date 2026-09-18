@@ -122,6 +122,12 @@
         app:summaryEntries="@array/backup_limits_summary_entries"
         tools:title="Backups"/>
 
+    <com.ichi2.preferences.HeaderPreference
+        android:fragment="com.ichi2.anki.preferences.AnkiquestSettingsFragment"
+        android:key="@string/ankiquest_screen_key"
+        android:title="@string/ankiquest_screen_title"
+        android:icon="@drawable/ic_cards_star"/>
+
     <!-- Advanced Preferences -->
     <com.ichi2.preferences.HeaderPreference
         android:fragment="com.ichi2.anki.preferences.AdvancedSettingsFragment"

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/ankiquest_screen_title"
+    android:key="@string/ankiquest_screen_key">
+    <com.ichi2.preferences.VersatileTextPreference
+        android:key="@string/ankiquest_url_key"
+        android:title="@string/ankiquest_url_title"
+        android:inputType="textUri"
+        app:dialogHint="@string/dialog_hint_url"
+        app:useSimpleSummaryProvider="true" />
+    <com.ichi2.preferences.VersatileTextPreference
+        android:key="@string/ankiquest_user_key"
+        android:title="@string/ankiquest_user_title"
+        android:inputType="text"
+        app:useSimpleSummaryProvider="true" />
+    <com.ichi2.preferences.VersatileTextPreference
+        android:key="@string/ankiquest_token_key"
+        android:title="@string/ankiquest_token_title"
+        android:inputType="textPassword" />
+</PreferenceScreen>

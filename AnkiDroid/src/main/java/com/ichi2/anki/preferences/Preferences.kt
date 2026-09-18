@@ -310,6 +310,7 @@ fun getFragmentFromXmlRes(
         R.xml.preferences_sync -> SyncSettingsFragment()
         R.xml.preferences_backup_limits -> BackupLimitsSettingsFragment()
         R.xml.preferences_custom_sync_server -> CustomSyncServerSettingsFragment()
+        R.xml.preferences_ankiquest -> AnkiquestSettingsFragment()
         R.xml.preferences_notifications -> NotificationsSettingsFragment()
         R.xml.preferences_appearance -> AppearanceSettingsFragment()
         R.xml.preferences_controls -> ControlsSettingsFragment()
