@@ -48,20 +48,23 @@ import org.json.JSONObject
 import timber.log.Timber
 import java.lang.ref.WeakReference
 import java.net.URLEncoder
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 /**
  * Shows XP, combo, quest and level feedback from an ankiquest server after each answer.
  *
- * Reviews which have not been synced yet are sent to the server's preview endpoint, which
- * returns the profile as it will look after the next sync. Nothing is stored server-side.
+ * With a token, new review log rows are uploaded to the server. Without one, they are only
+ * sent to its preview endpoint, which stores nothing.
  */
 object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallbacks {
     const val URL_KEY = "ankiquestUrl"
     const val USER_KEY = "ankiquestUser"
+    const val TOKEN_KEY = "ankiquestToken"
 
     private const val MAX_PENDING = 5000
     private const val BASELINE_MAX_AGE_MS = 10 * 60 * 1000L
+    private const val RESUME_UPLOAD_INTERVAL_MS = 60 * 1000L
     private const val BANNER_MS = 1800L
     private const val BANNER_LONG_MS = 3500L
     private const val BANNER_TAG = "ankiquest_banner"
@@ -71,13 +74,14 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     private val client =
         OkHttpClient
             .Builder()
-            .callTimeout(4, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
             .build()
     private val json = "application/json".toMediaType()
 
     private var activity = WeakReference<Activity>(null)
     private var syncedLastId = 0L
     private var baselineAt = 0L
+    private var resumeUploadAt = 0L
     private var previous: Snapshot? = null
 
     private data class Snapshot(
@@ -115,42 +119,104 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     ) {
         if (!changes.studyQueues) return
         if (handler !is Reviewer && handler !is ReviewerViewModel) return
+        launchRefresh(showFeedback = true)
+    }
+
+    private fun launchRefresh(showFeedback: Boolean) {
         val (url, user) = endpoint() ?: return
+        val token =
+            AnkiDroidApp
+                .sharedPrefs()
+                .getString(TOKEN_KEY, "")
+                .orEmpty()
+                .trim()
         scope.launch {
             try {
-                mutex.withLock { refresh(url, user) }
+                mutex.withLock {
+                    val profile = if (token.isEmpty()) preview(url, user) else upload(url, user, token)
+                    if (profile != null) present(profile, showFeedback)
+                }
             } catch (e: Exception) {
                 Timber.w(e, "ankiquest refresh failed")
             }
         }
     }
 
-    private suspend fun refresh(
+    private suspend fun preview(
         url: String,
         user: String,
-    ) {
+    ): JSONObject? {
         val now = TimeManager.time.intTimeMS()
         if (now - baselineAt > BASELINE_MAX_AGE_MS) {
-            val baseline = get("$url/api/profile/$user") ?: return
+            val baseline = get("$url/api/profile/$user") ?: return null
             syncedLastId = baseline.optLong("last_review_id")
             baselineAt = now
         }
-        val pending = pendingReviews(syncedLastId)
-        val body = JSONObject().put("reviews", pending).toString().toRequestBody(json)
-        val profile =
-            execute(
-                Request
-                    .Builder()
-                    .url("$url/api/preview/$user")
-                    .post(body)
-                    .build(),
-            ) ?: return
+        val body = JSONObject().put("reviews", pendingReviews(syncedLastId))
+        return execute(
+            Request
+                .Builder()
+                .url("$url/api/preview/$user")
+                .post(body.toString().toRequestBody(json))
+                .build(),
+        )
+    }
+
+    private suspend fun upload(
+        url: String,
+        user: String,
+        token: String,
+    ): JSONObject? {
+        if (baselineAt == 0L) {
+            syncedLastId = get("$url/api/profile/$user")?.optLong("last_review_id") ?: 0L
+            baselineAt = TimeManager.time.intTimeMS()
+        }
+        val clock = clock()
+        var profile: JSONObject?
+        do {
+            val pending = pendingReviews(syncedLastId)
+            val body =
+                JSONObject()
+                    .put("reviews", pending)
+                    .put("clock", clock)
+                    .put("silent", syncedLastId == 0L || pending.length() == MAX_PENDING)
+            profile =
+                execute(
+                    Request
+                        .Builder()
+                        .url("$url/api/reviews/$user")
+                        .header("Authorization", "Bearer $token")
+                        .post(body.toString().toRequestBody(json))
+                        .build(),
+                ) ?: return null
+            syncedLastId = maxOf(syncedLastId, profile.optLong("last_review_id"))
+        } while (pending.length() == MAX_PENDING)
+        return profile
+    }
+
+    private suspend fun present(
+        profile: JSONObject,
+        showFeedback: Boolean,
+    ) {
         val snapshot = snapshotOf(profile)
         val message = previous?.let { describe(it, snapshot) }
         previous = snapshot
-        if (message != null) {
+        if (showFeedback && message != null) {
             withContext(Dispatchers.Main) { showBanner(message.first, message.second) }
         }
+    }
+
+    private suspend fun clock(): JSONObject {
+        val rollover =
+            CollectionManager.withCol {
+                runCatching {
+                    db.queryString("select cast(val as text) from config where key = 'rollover'").trim().toInt()
+                }.getOrDefault(4)
+            }
+        val now = TimeManager.time.intTimeMS()
+        return JSONObject()
+            .put("rollover_hour", rollover)
+            .put("offset_west_min", -TimeZone.getDefault().getOffset(now) / 60_000)
     }
 
     private suspend fun pendingReviews(afterId: Long): JSONArray =
@@ -159,7 +225,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             db
                 .query(
                     "select id, cid, lastIvl, time, type from revlog " +
-                        "where id > ? and ease > 0 and type < 4 order by id desc limit $MAX_PENDING",
+                        "where id > ? and ease > 0 and type < 4 order by id limit $MAX_PENDING",
                     afterId,
                 ).use { cursor ->
                     while (cursor.moveToNext()) {
@@ -287,6 +353,11 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
 
     override fun onActivityResumed(activity: Activity) {
         this.activity = WeakReference(activity)
+        val now = TimeManager.time.intTimeMS()
+        if (now - resumeUploadAt > RESUME_UPLOAD_INTERVAL_MS) {
+            resumeUploadAt = now
+            launchRefresh(showFeedback = false)
+        }
     }
 
     override fun onActivityPaused(activity: Activity) {
