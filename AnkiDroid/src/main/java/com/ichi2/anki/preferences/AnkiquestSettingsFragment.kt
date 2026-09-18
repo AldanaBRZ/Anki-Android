@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import com.ichi2.anki.R
 import com.ichi2.anki.ankiquest.Ankiquest
+import com.ichi2.anki.ankiquest.AnkiquestUpdater
 import com.ichi2.preferences.VersatileTextPreference
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -33,13 +34,19 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             VersatileTextPreference.Validator { value ->
                 if (value.isNotEmpty()) value.toHttpUrl()
             }
-        bindAction(R.string.ankiquest_test_key, uploadAll = false)
-        bindAction(R.string.ankiquest_upload_all_key, uploadAll = true)
+        bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
+        bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
+        requirePreference<Preference>(R.string.ankiquest_check_updates_key).summary =
+            getString(
+                R.string.ankiquest_check_updates_summary,
+                AnkiquestUpdater.installed() ?: getString(R.string.ankiquest_local_build),
+            )
+        bindAction(R.string.ankiquest_check_updates_key) { AnkiquestUpdater.checkNow(requireActivity()) }
     }
 
     private fun bindAction(
         key: Int,
-        uploadAll: Boolean,
+        action: suspend () -> String?,
     ) {
         val preference = requirePreference<Preference>(key)
         val idleSummary = preference.summary
@@ -51,11 +58,12 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             lifecycleScope.launch {
                 val message =
                     try {
-                        Ankiquest.runFromSettings(context, uploadAll)
+                        action()
                     } finally {
                         running = false
                         preference.summary = idleSummary
                     }
+                if (message == null) return@launch
                 AlertDialog
                     .Builder(context)
                     .setTitle(preference.title)

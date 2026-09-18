@@ -89,6 +89,29 @@ object AnkiquestUpdater {
         }
     }
 
+    /** The installed release, e.g. `quest-3`, or null for a local build. */
+    fun installed(): String? = BuildConfig.ANKIQUEST_RELEASE.takeIf { it > 0 }?.let { "$TAG_PREFIX$it" }
+
+    /**
+     * Checks for a newer release right away and offers it.
+     *
+     * @return a message to show when nothing is offered, or null when the update dialog is shown
+     */
+    suspend fun checkNow(activity: Activity): String? {
+        val release =
+            try {
+                withContext(Dispatchers.IO) { latest() }
+            } catch (e: Exception) {
+                Timber.w(e, "ankiquest update check failed")
+                null
+            } ?: return activity.getString(R.string.ankiquest_update_check_failed)
+        if (release.number <= BuildConfig.ANKIQUEST_RELEASE) {
+            return activity.getString(R.string.ankiquest_update_none, release.name)
+        }
+        offer(activity, release)
+        return null
+    }
+
     private fun latest(): Release? {
         val request =
             Request

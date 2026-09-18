@@ -33,6 +33,12 @@
     <string name="ankiquest_widget_unconfigured" translatable="false">Set up ankiquest in Settings</string>
     <string name="ankiquest_widget_empty" translatable="false">Nobody has uploaded reviews yet</string>
     <string name="ankiquest_widget_offline" translatable="false">Could not reach the ankiquest server</string>
+    <string name="ankiquest_check_updates_key" translatable="false">ankiquestCheckUpdates</string>
+    <string name="ankiquest_check_updates_title" translatable="false" maxLength="41">Check for updates</string>
+    <string name="ankiquest_check_updates_summary" translatable="false">Installed: %1$s</string>
+    <string name="ankiquest_local_build" translatable="false">local build</string>
+    <string name="ankiquest_update_none" translatable="false">You have the latest version (%1$s).</string>
+    <string name="ankiquest_update_check_failed" translatable="false">Could not check GitHub for updates. Try again later.</string>
     <string name="ankiquest_update_title" translatable="false">%1$s available</string>
     <string name="ankiquest_update_message" translatable="false">A new AnkiDroid Quest build is ready (%1$d MB). Your collection is kept.</string>
     <string name="ankiquest_update_install" translatable="false">Update</string>

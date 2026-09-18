@@ -26,4 +26,7 @@
         android:key="@string/ankiquest_upload_all_key"
         android:title="@string/ankiquest_upload_all_title"
         android:summary="@string/ankiquest_upload_all_summary" />
+    <Preference
+        android:key="@string/ankiquest_check_updates_key"
+        android:title="@string/ankiquest_check_updates_title" />
 </PreferenceScreen>
