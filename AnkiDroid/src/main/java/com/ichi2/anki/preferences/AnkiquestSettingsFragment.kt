@@ -16,6 +16,7 @@ package com.ichi2.anki.preferences
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -102,6 +103,12 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         val people = (0 until rows.length()).map { rows.getJSONObject(it) }
         val selected = deck.getJSONArray("recipients")
         val selectedIds = (0 until selected.length()).map { selected.getString(it) }.toSet()
+        val allDecks = settings.getJSONArray("decks").let { list -> (0 until list.length()).map { list.getJSONObject(it) } }
+        val subdecks = Ankiquest.subdeckIds(allDecks, deck.getString("name"))
+        val includeSubdecks =
+            CheckBox(context).apply {
+                text = resources.getQuantityString(R.plurals.ankiquest_deck_notifications_subdecks, subdecks.size, subdecks.size)
+            }
         val checked = people.map { it.getString("user") in selectedIds }.toBooleanArray()
         val enabled =
             SwitchCompat(context).apply {
@@ -114,6 +121,7 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 val padding = (24 * resources.displayMetrics.density).toInt()
                 setPadding(padding, padding / 2, padding, 0)
                 addView(enabled)
+                if (subdecks.isNotEmpty()) addView(includeSubdecks)
                 addView(
                     TextView(context).apply {
                         setText(
@@ -153,7 +161,8 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 save.isEnabled = false
                 lifecycleScope.launch {
                     try {
-                        Ankiquest.saveDeckNotificationSettings(deck.getString("id"), enabled.isChecked, recipients)
+                        val ids = listOf(deck.getString("id")) + if (includeSubdecks.isChecked) subdecks else emptyList()
+                        Ankiquest.saveDeckNotificationSettings(ids, enabled.isChecked, recipients)
                         dialog.dismiss()
                     } catch (e: Exception) {
                         save.isEnabled = true

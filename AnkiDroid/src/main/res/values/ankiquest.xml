@@ -9,6 +9,10 @@
     <string name="ankiquest_deck_notifications_no_people" translatable="false">There are no other players on this server yet.</string>
     <string name="ankiquest_deck_notifications_choose_people" translatable="false">Select at least one person, or switch sharing off.</string>
     <string name="ankiquest_deck_notifications_save" translatable="false">Save</string>
+    <plurals name="ankiquest_deck_notifications_subdecks" translatable="false">
+        <item quantity="one">Also apply to its %d subdeck</item>
+        <item quantity="other">Also apply to all %d subdecks</item>
+    </plurals>
     <string name="ankiquest_screen_key" translatable="false">ankiquestScreen</string>
     <string name="ankiquest_screen_title" translatable="false" maxLength="41">ankiquest</string>
     <string name="ankiquest_menu_title" translatable="false" maxLength="28">ankiquest</string>
