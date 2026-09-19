@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ankiquest_deck_notifications_key" translatable="false">ankiquestDeckNotifications</string>
-    <string name="ankiquest_deck_notifications_title" translatable="false">Deck completion notifications</string>
+    <string name="ankiquest_deck_notifications_title" translatable="false" maxLength="41">Deck completion notifications</string>
     <string name="ankiquest_deck_notifications_summary" translatable="false">Choose who hears when you finish a deck for the day</string>
     <string name="ankiquest_deck_notifications_enabled" translatable="false">Share this deck’s daily completion</string>
     <string name="ankiquest_deck_notifications_help" translatable="false">Select the people to notify, once per study day. Subdecks count toward completion, including learning due later today. Changes apply to future completions.</string>
