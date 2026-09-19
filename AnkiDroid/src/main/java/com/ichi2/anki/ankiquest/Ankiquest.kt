@@ -156,27 +156,34 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             }
         }
 
-    /** Establish the upload baseline and local deck catalog before loading private preferences. */
+    /** Silently refresh the complete local catalog before loading private preferences. */
     suspend fun deckNotificationSettings(): JSONObject =
         withContext(Dispatchers.IO) {
             val (url, user, token) = authenticatedEndpoint()
             mutex.withLock {
-                upload(url, user, token, resync = false)
+                upload(url, user, token, resync = false, catalog = true)
                 val local =
                     CollectionManager.withCol {
                         decks.allNamesAndIds(includeFiltered = false).map { it.id.toString() }.toSet()
                     }
-                execute(
-                    Request
-                        .Builder()
-                        .url("$url/api/decks/$user")
-                        .header("Authorization", "Bearer $token")
-                        .build(),
-                ).also { settings ->
+                fetchDeckNotificationSettings(url, user, token).also { settings ->
                     settings.put("decks", JSONArray(settings.getJSONArray("decks").objects().filter { it.getString("id") in local }))
                 }
             }
         }
+
+    private fun fetchDeckNotificationSettings(
+        url: String,
+        user: String,
+        token: String,
+    ): JSONObject =
+        execute(
+            Request
+                .Builder()
+                .url("$url/api/decks/$user")
+                .header("Authorization", "Bearer $token")
+                .build(),
+        )
 
     suspend fun saveDeckNotificationSettings(
         id: String,
@@ -288,6 +295,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         token: String,
         resync: Boolean,
         onlyTest: Boolean = false,
+        catalog: Boolean = false,
     ): JSONObject {
         val prefs = AnkiDroidApp.sharedPrefs()
         val mark = prefs.getLong(MARK_KEY, 0L)
@@ -312,17 +320,31 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             val body =
                 JSONObject()
                     .put("clock", clock)
-                    .put("silent", AnkiquestCompletionPolicy.silentUpload(mark, initialSyncDone, full, onlyTest))
+                    .put("silent", catalog || AnkiquestCompletionPolicy.silentUpload(mark, initialSyncDone, full, onlyTest))
             if (first) {
                 restored.forEach { batch.put(it) }
                 body.put("deleted", JSONArray(deleted.toList()))
             }
             body.put("reviews", batch)
-            // Only the final batch represents a complete upload; settings checks are not study.
+            // Only the final batch represents complete progress; connection checks are not study.
             if (!full && !onlyTest) {
-                runCatching { deckSnapshots(clock) }
-                    .onSuccess { body.put("decks", it) }
-                    .onFailure { Timber.w(it, "ankiquest deck progress unavailable; uploading reviews only") }
+                runCatching {
+                    if (catalog) {
+                        deckSnapshots(clock)
+                    } else {
+                        // Fetch for this captured account each time so changed or revoked sharing is respected.
+                        val enabled =
+                            fetchDeckNotificationSettings(url, user, token)
+                                .getJSONArray("decks")
+                                .objects()
+                                .filter { it.getBoolean("enabled") }
+                                .map { it.getString("id") }
+                                .toSet()
+                        if (enabled.isEmpty()) null else JSONArray(deckSnapshots(clock).objects().filter { it.getString("id") in enabled })
+                    }
+                }.onSuccess { decks ->
+                    if (decks != null) body.put("decks", decks).put("catalog", catalog)
+                }.onFailure { Timber.w(it, "ankiquest deck progress unavailable; uploading reviews only") }
             }
             profile =
                 execute(
