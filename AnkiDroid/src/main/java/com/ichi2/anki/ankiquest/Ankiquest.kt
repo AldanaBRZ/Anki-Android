@@ -185,22 +185,32 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                 .build(),
         )
 
+    /** Stores the same sharing choice for every deck in [ids] in one request. */
     suspend fun saveDeckNotificationSettings(
-        id: String,
+        ids: List<String>,
         enabled: Boolean,
         recipients: List<String>,
     ) = withContext(Dispatchers.IO) {
         val (url, user, token) = authenticatedEndpoint()
-        val deck = JSONObject().put("id", id).put("enabled", enabled).put("recipients", JSONArray(recipients))
+        val decks = JSONArray()
+        for (id in ids) {
+            decks.put(JSONObject().put("id", id).put("enabled", enabled).put("recipients", JSONArray(recipients)))
+        }
         execute(
             Request
                 .Builder()
                 .url("$url/api/decks/$user")
                 .header("Authorization", "Bearer $token")
-                .post(JSONObject().put("decks", JSONArray().put(deck)).toString().toRequestBody(json))
+                .post(JSONObject().put("decks", decks).toString().toRequestBody(json))
                 .build(),
         )
     }
+
+    /** The ids of every deck nested below the deck called [name] in the settings deck list. */
+    fun subdeckIds(
+        decks: List<JSONObject>,
+        name: String,
+    ): List<String> = decks.filter { it.getString("name").startsWith("$name::") }.map { it.getString("id") }
 
     /** The account key accompanies the response so a settings change cannot mix inbox cursors. */
     suspend fun completionNotifications(): Pair<String, JSONArray>? =

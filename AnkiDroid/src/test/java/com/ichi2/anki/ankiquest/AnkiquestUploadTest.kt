@@ -192,6 +192,33 @@ class AnkiquestUploadTest : RobolectricTest() {
             assertTrue(reviewUpload().getBoolean("silent"))
         }
 
+    @Test
+    fun `saving for subdecks stores the same choice for each deck in one request`() =
+        runBlocking {
+            Ankiquest.saveDeckNotificationSettings(listOf("1", unsharedDeck.toString()), true, listOf("hill"))
+
+            val saves = requests.filter { it.method == "POST" && it.path == "/api/decks/cerro" }
+            assertEquals(1, saves.size)
+            val decks = saves.single().body!!.getJSONArray("decks")
+            val ids = (0 until decks.length()).map { decks.getJSONObject(it).getString("id") }
+            assertEquals(setOf("1", unsharedDeck.toString()), ids.toSet())
+            for (i in 0 until decks.length()) {
+                val deck = decks.getJSONObject(i)
+                assertTrue(deck.getBoolean("enabled"))
+                assertEquals("hill", deck.getJSONArray("recipients").getString(0))
+            }
+        }
+
+    @Test
+    fun `subdecks are nested decks, not decks sharing a name prefix`() {
+        val decks =
+            listOf("Spanish", "Spanish::Verbs", "Spanish::Verbs::Irregular", "Spanish Extra", "Geography")
+                .mapIndexed { i, name -> JSONObject().put("id", "$i").put("name", name) }
+        assertEquals(listOf("1", "2"), Ankiquest.subdeckIds(decks, "Spanish"))
+        assertEquals(listOf("2"), Ankiquest.subdeckIds(decks, "Spanish::Verbs"))
+        assertEquals(emptyList(), Ankiquest.subdeckIds(decks, "Geography"))
+    }
+
     private fun configureAccount(
         user: String,
         token: String,
