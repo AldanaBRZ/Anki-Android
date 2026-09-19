@@ -11,15 +11,14 @@ import android.os.Parcelable
 import com.ichi2.anki.CollectionManager.withCol
 import com.ichi2.anki.common.android.appContext
 import com.ichi2.anki.common.annotations.NeedsTest
-import com.ichi2.anki.compat.CompatHelper.Companion.compat
 import com.ichi2.anki.compat.CompatHelper.Companion.getSerializableCompat
 import com.ichi2.anki.libanki.CardTemplate
 import com.ichi2.anki.libanki.NoteTypeId
 import com.ichi2.anki.libanki.NotetypeJson
 import com.ichi2.anki.observability.undoableOp
+import com.ichi2.anki.utils.ext.readJson
+import com.ichi2.anki.utils.ext.writeJson
 import timber.log.Timber
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 
@@ -362,10 +361,8 @@ class CardTemplateNotetype(
             Timber.d("saveTempNoteType() saving tempNoteType")
             var tempNoteTypeFile: File
             try {
-                ByteArrayInputStream(tempNoteType.toString().toByteArray()).use { source ->
-                    tempNoteTypeFile = File.createTempFile("editedTemplate", ".json", context.cacheDir)
-                    compat.copyFile(source, tempNoteTypeFile.absolutePath)
-                }
+                tempNoteTypeFile = File.createTempFile("editedTemplate", ".json", context.cacheDir)
+                tempNoteTypeFile.writeJson(tempNoteType.jsonObject)
             } catch (ioe: IOException) {
                 Timber.e(ioe, "Unable to create+write temp file for note type")
                 return null
@@ -381,10 +378,7 @@ class CardTemplateNotetype(
         fun getTempNoteType(tempNoteTypeFileName: String): NotetypeJson {
             Timber.d("getTempNoteType() fetching tempNoteType %s", tempNoteTypeFileName)
             try {
-                ByteArrayOutputStream().use { target ->
-                    compat.copyFile(tempNoteTypeFileName, target)
-                    return NotetypeJson(target.toString())
-                }
+                return NotetypeJson(File(tempNoteTypeFileName).readJson())
             } catch (e: IOException) {
                 Timber.e(e, "Unable to read+parse tempNoteType from file %s", tempNoteTypeFileName)
                 throw e
@@ -509,9 +503,7 @@ class NotetypeFile(
      */
     constructor(directory: File, notetype: NotetypeJson) : this(createTempFile("notetype", ".tmp", directory).absolutePath) {
         try {
-            ByteArrayInputStream(notetype.toString().toByteArray()).use { source ->
-                compat.copyFile(source, this.absolutePath)
-            }
+            writeJson(notetype.jsonObject)
         } catch (ioe: IOException) {
             Timber.w(ioe, "Unable to create+write temp file for note type")
         }
@@ -525,10 +517,7 @@ class NotetypeFile(
 
     fun getNotetype(): NotetypeJson =
         try {
-            ByteArrayOutputStream().use { target ->
-                compat.copyFile(absolutePath, target)
-                NotetypeJson(target.toString())
-            }
+            NotetypeJson(readJson())
         } catch (e: IOException) {
             Timber.w(e, "Unable to read+parse tempNoteType from file %s", absolutePath)
             throw e

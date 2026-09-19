@@ -167,6 +167,19 @@ interface AnkiTest {
         col
     }
 
+    /**
+     * Prevent DayRolloverAlarm from unburying cards during the test.
+     * Call before burying cards to process any pending day rollover.
+     */
+    fun preventDayRolloverAlarmFromUnburyingCards() {
+        col.backend.schedTimingToday()
+    }
+
+    /** Reproduces DayRolloverAlarm's cutoff query, which also processes pending day rollover. */
+    fun simulateDayRolloverAlarmCutoffQuery() {
+        col.sched.dayCutoff
+    }
+
     fun addDeck(
         deckName: String?,
         setAsSelected: Boolean = false,
@@ -411,6 +424,9 @@ interface AnkiTest {
 
     val Notetypes.basicAndReversed
         get() = byName("Basic (and reversed card)")!!
+
+    val Notetypes.basicOptionalReversed
+        get() = byName("Basic (optional reversed card)")!!
 
     val Notetypes.cloze
         get() = byName("Cloze")!!
