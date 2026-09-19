@@ -2,9 +2,11 @@
 
 package com.ichi2.anki.ankiquest
 
+import android.app.Activity
 import android.app.Application
 import android.appwidget.AppWidgetHostView
 import android.content.ComponentName
+import android.os.Looper
 import android.view.View
 import android.view.View.MeasureSpec
 import android.widget.FrameLayout
@@ -19,6 +21,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
@@ -98,9 +101,15 @@ class AnkiquestWidgetTest : RobolectricTest() {
         val root = populatedWidget()
         val list = root.findViewById<ListView>(R.id.ankiquest_widget_list)
         val adapter = assertNotNull(list.adapter)
-        val row = adapter.getView(7, null, list)
+        measureWidget(root)
+        list.setSelection(7)
+        measureWidget(root)
+        // RemoteViews resolves the click template through the row's real AdapterView parent.
+        val row = assertNotNull(list.getChildAt(7 - list.firstVisiblePosition))
+        assertEquals("Player 8", row.text(R.id.ankiquest_widget_name))
 
         assertTrue(list.performItemClick(row, 7, adapter.getItemId(7)))
+        shadowOf(Looper.getMainLooper()).idle()
 
         val application = ApplicationProvider.getApplicationContext<Application>()
         val intent = assertNotNull(shadowOf(application).nextStartedActivity)
@@ -116,7 +125,16 @@ class AnkiquestWidgetTest : RobolectricTest() {
             R.id.ankiquest_widget_list,
             AnkiquestWidget.collection(targetContext, board),
         )
-        return views.apply(targetContext, AppWidgetHostView(targetContext))
+        val controller = Robolectric.buildActivity(Activity::class.java).create()
+        saveControllerForCleanup(controller)
+        val activity = controller.get()
+        val host = AppWidgetHostView(activity)
+        val root = views.apply(activity, host)
+        host.addView(root)
+        activity.setContentView(host)
+        controller.start().resume().visible()
+        shadowOf(Looper.getMainLooper()).idle()
+        return root
     }
 
     private fun measureWidget(root: View) {
