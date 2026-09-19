@@ -23,6 +23,8 @@ import android.content.Intent
 import android.text.format.DateUtils
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.DrawableRes
+import androidx.annotation.LayoutRes
 import androidx.core.app.PendingIntentCompat
 import androidx.core.widget.RemoteViewsCompat
 import androidx.core.widget.RemoteViewsCompat.RemoteCollectionItems
@@ -32,7 +34,7 @@ import org.json.JSONArray
 import java.text.NumberFormat
 
 /** Scrollable homescreen leaderboard. Tapping the header or a player opens the dashboard. */
-class AnkiquestWidget : AppWidgetProvider() {
+open class AnkiquestWidget : AppWidgetProvider() {
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -63,6 +65,29 @@ class AnkiquestWidget : AppWidgetProvider() {
         private const val MIN_REFRESH_MS = 30 * 1000L
         private val medals = arrayOf("👑", "🥈", "🥉")
 
+        internal class Style(
+            val provider: Class<out AnkiquestWidget>,
+            @LayoutRes val layout: Int,
+            @LayoutRes val rowLayout: Int,
+            @DrawableRes val ownRow: Int,
+        )
+
+        internal val styles =
+            listOf(
+                Style(
+                    AnkiquestWidget::class.java,
+                    R.layout.widget_ankiquest,
+                    R.layout.widget_ankiquest_row,
+                    R.drawable.ankiquest_widget_row_self,
+                ),
+                Style(
+                    AnkiquestTransparentWidget::class.java,
+                    R.layout.widget_ankiquest_transparent,
+                    R.layout.widget_ankiquest_row_transparent,
+                    R.drawable.ankiquest_widget_row_self_clear,
+                ),
+            )
+
         @Volatile
         private var requestedAt = 0L
 
@@ -74,21 +99,26 @@ class AnkiquestWidget : AppWidgetProvider() {
             AnkiquestPoll.refreshNow(context)
         }
 
-        private fun widgetIds(context: Context): IntArray =
+        private fun widgetIds(
+            context: Context,
+            style: Style,
+        ): IntArray =
             AppWidgetManager
                 .getInstance(context)
-                .getAppWidgetIds(ComponentName(context, AnkiquestWidget::class.java))
+                .getAppWidgetIds(ComponentName(context, style.provider))
 
         private fun showRefreshing(context: Context) {
-            val ids = widgetIds(context)
-            if (ids.isEmpty()) return
-            val views = RemoteViews(context.packageName, R.layout.widget_ankiquest)
-            views.setTextViewText(R.id.ankiquest_widget_updated, "…")
-            AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(ids, views)
+            for (style in styles) {
+                val ids = widgetIds(context, style)
+                if (ids.isEmpty()) continue
+                val views = RemoteViews(context.packageName, style.layout)
+                views.setTextViewText(R.id.ankiquest_widget_updated, "…")
+                AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(ids, views)
+            }
         }
 
         /**
-         * Draws [board] into every placed widget.
+         * Draws [board] into every placed widget of every style.
          *
          * @param board this week's standings, or null when ankiquest is not configured
          * @param fetchedAt when [board] was fetched from the server
@@ -100,16 +130,17 @@ class AnkiquestWidget : AppWidgetProvider() {
             fetchedAt: Long,
             offline: Boolean,
         ) {
-            val ids = widgetIds(context)
-            if (ids.isEmpty()) return
-            val items = collection(context, board ?: JSONArray())
             val manager = AppWidgetManager.getInstance(context)
-            for (id in ids) {
-                val views = layout(context, board, fetchedAt, offline)
-                // The compatibility adapter persists rows for older Android versions and uses
-                // native collection items on newer ones. Each placed widget needs its own ID.
-                RemoteViewsCompat.setRemoteAdapter(context, views, id, R.id.ankiquest_widget_list, items)
-                manager.updateAppWidget(id, views)
+            for (style in styles) {
+                val ids = widgetIds(context, style)
+                if (ids.isEmpty()) continue
+                val items = collection(context, board ?: JSONArray(), style)
+                for (id in ids) {
+                    val views = layout(context, board, fetchedAt, offline, style)
+                    // Each placed widget needs its own adapter ID, including transparent ones.
+                    RemoteViewsCompat.setRemoteAdapter(context, views, id, R.id.ankiquest_widget_list, items)
+                    manager.updateAppWidget(id, views)
+                }
             }
         }
 
@@ -118,8 +149,9 @@ class AnkiquestWidget : AppWidgetProvider() {
             board: JSONArray?,
             fetchedAt: Long,
             offline: Boolean,
+            style: Style = styles.first(),
         ): RemoteViews {
-            val views = RemoteViews(context.packageName, R.layout.widget_ankiquest)
+            val views = RemoteViews(context.packageName, style.layout)
             views.setOnClickPendingIntent(
                 R.id.ankiquest_widget_root,
                 PendingIntent.getActivity(
@@ -144,7 +176,7 @@ class AnkiquestWidget : AppWidgetProvider() {
                 PendingIntent.getBroadcast(
                     context,
                     1,
-                    Intent(context, AnkiquestWidget::class.java).setAction(ACTION_REFRESH),
+                    Intent(context, style.provider).setAction(ACTION_REFRESH),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
@@ -180,6 +212,7 @@ class AnkiquestWidget : AppWidgetProvider() {
         internal fun collection(
             context: Context,
             board: JSONArray,
+            style: Style = styles.first(),
         ): RemoteCollectionItems {
             val items = RemoteCollectionItems.Builder().setViewTypeCount(1)
             val me = Ankiquest.player()
@@ -189,11 +222,11 @@ class AnkiquestWidget : AppWidgetProvider() {
                 val entry = board.getJSONObject(i)
                 val weekXp = entry.getLong("week_xp")
                 val streak = entry.optInt("streak")
-                val views = RemoteViews(context.packageName, R.layout.widget_ankiquest_row)
+                val views = RemoteViews(context.packageName, style.rowLayout)
                 views.setInt(
                     R.id.ankiquest_widget_row,
                     "setBackgroundResource",
-                    if (entry.getString("user") == me) R.drawable.ankiquest_widget_row_self else 0,
+                    if (entry.getString("user") == me) style.ownRow else 0,
                 )
                 views.setTextViewText(R.id.ankiquest_widget_rank, medals.getOrNull(i) ?: "${i + 1}")
                 views.setTextViewText(R.id.ankiquest_widget_name, entry.getString("display"))
@@ -211,3 +244,6 @@ class AnkiquestWidget : AppWidgetProvider() {
         }
     }
 }
+
+/** The same leaderboard without a background, drawn straight on the wallpaper. */
+class AnkiquestTransparentWidget : AnkiquestWidget()

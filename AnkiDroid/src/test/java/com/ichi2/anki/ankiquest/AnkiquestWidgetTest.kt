@@ -26,6 +26,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
@@ -116,14 +117,42 @@ class AnkiquestWidgetTest : RobolectricTest() {
         assertEquals(ComponentName(targetContext, AnkiquestActivity::class.java), intent.component)
     }
 
-    private fun populatedWidget(board: JSONArray = leaderboard()): View {
-        val views = AnkiquestWidget.layout(targetContext, board, 0, false)
+    @Test
+    fun `transparent widget preserves its appearance while scrolling and opening a player`() {
+        val root = populatedWidget(transparent = true)
+        val list = root.findViewById<ListView>(R.id.ankiquest_widget_list)
+        assertNull(root.background)
+        measureWidget(root)
+        assertTrue(list.canScrollVertically(1))
+        list.setSelection(7)
+        measureWidget(root)
+
+        val row = assertNotNull(list.getChildAt(7 - list.firstVisiblePosition))
+        val name = row.findViewById<TextView>(R.id.ankiquest_widget_name)
+        assertEquals("Player 8", name.text.toString())
+        assertEquals(targetContext.getColor(R.color.ankiquest_widget_clear_text), name.currentTextColor)
+        assertTrue(name.shadowRadius > 0)
+        assertTrue(root.findViewById<View>(R.id.ankiquest_widget_refresh).isShown)
+        assertTrue(list.performItemClick(row, 7, assertNotNull(list.adapter).getItemId(7)))
+        shadowOf(Looper.getMainLooper()).idle()
+
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        val intent = assertNotNull(shadowOf(application).nextStartedActivity)
+        assertEquals(ComponentName(targetContext, AnkiquestActivity::class.java), intent.component)
+    }
+
+    private fun populatedWidget(
+        board: JSONArray = leaderboard(),
+        transparent: Boolean = false,
+    ): View {
+        val style = AnkiquestWidget.styles[if (transparent) 1 else 0]
+        val views = AnkiquestWidget.layout(targetContext, board, 0, false, style)
         RemoteViewsCompat.setRemoteAdapter(
             targetContext,
             views,
             1,
             R.id.ankiquest_widget_list,
-            AnkiquestWidget.collection(targetContext, board),
+            AnkiquestWidget.collection(targetContext, board, style),
         )
         val controller = Robolectric.buildActivity(Activity::class.java).create()
         saveControllerForCleanup(controller)

@@ -3,6 +3,8 @@
 package com.ichi2.anki.ankiquest
 
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import java.io.File
@@ -12,7 +14,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** Resource checks run without an Android runtime and cover the widget's scrolling viewport. */
-class AnkiquestWidgetLayoutTest {
+@RunWith(Parameterized::class)
+class AnkiquestWidgetLayoutTest(
+    private val layoutName: String,
+) {
     @Test
     fun `leaderboard scrolls within the available widget height`() {
         val root = widgetLayout()
@@ -50,10 +55,10 @@ class AnkiquestWidgetLayoutTest {
         )
 
     private fun widgetLayout(): Element {
-        val path = "src/main/res/layout/widget_ankiquest.xml"
+        val path = "src/main/res/layout/$layoutName.xml"
         val layout = listOf(File(path), File("AnkiDroid", path)).firstOrNull { it.isFile }
         val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
-        return factory.newDocumentBuilder().parse(assertNotNull(layout, "Cannot locate widget_ankiquest.xml")).documentElement
+        return factory.newDocumentBuilder().parse(assertNotNull(layout, "Cannot locate $layoutName.xml")).documentElement
     }
 
     private fun Element.android(name: String): String = getAttributeNS("http://schemas.android.com/apk/res/android", name)
@@ -61,5 +66,11 @@ class AnkiquestWidgetLayoutTest {
     private fun Element.descendants(): List<Element> {
         val nodes = getElementsByTagName("*")
         return (0 until nodes.length).map { nodes.item(it) as Element }
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
+        fun layouts(): List<String> = listOf("widget_ankiquest", "widget_ankiquest_transparent")
     }
 }
