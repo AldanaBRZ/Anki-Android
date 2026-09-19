@@ -182,19 +182,18 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         id: String,
         enabled: Boolean,
         recipients: List<String>,
-    ) =
-        withContext(Dispatchers.IO) {
-            val (url, user, token) = authenticatedEndpoint()
-            val deck = JSONObject().put("id", id).put("enabled", enabled).put("recipients", JSONArray(recipients))
-            execute(
-                Request
-                    .Builder()
-                    .url("$url/api/decks/$user")
-                    .header("Authorization", "Bearer $token")
-                    .post(JSONObject().put("decks", JSONArray().put(deck)).toString().toRequestBody(json))
-                    .build(),
-            )
-        }
+    ) = withContext(Dispatchers.IO) {
+        val (url, user, token) = authenticatedEndpoint()
+        val deck = JSONObject().put("id", id).put("enabled", enabled).put("recipients", JSONArray(recipients))
+        execute(
+            Request
+                .Builder()
+                .url("$url/api/decks/$user")
+                .header("Authorization", "Bearer $token")
+                .post(JSONObject().put("decks", JSONArray().put(deck)).toString().toRequestBody(json))
+                .build(),
+        )
+    }
 
     /** The account key accompanies the response so a settings change cannot mix inbox cursors. */
     suspend fun completionNotifications(): Pair<String, JSONArray>? =
@@ -217,7 +216,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
 
     private fun authenticatedEndpoint(): Triple<String, String, String> {
         val (url, user) = endpoint() ?: throw IllegalStateException("Set the server URL and player first.")
-        val token = AnkiDroidApp.sharedPrefs().getString(TOKEN_KEY, "").orEmpty().trim()
+        val token =
+            AnkiDroidApp
+                .sharedPrefs()
+                .getString(TOKEN_KEY, "")
+                .orEmpty()
+                .trim()
         check(token.isNotEmpty()) { "Set your ankiquest token to manage deck notifications." }
         return Triple(url, user, token)
     }

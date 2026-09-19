@@ -9,6 +9,7 @@ import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.libanki.CardType
 import com.ichi2.anki.libanki.QueueType
 import org.json.JSONObject
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.TimeZone
@@ -17,6 +18,12 @@ import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
 class AnkiquestDecksTest : RobolectricTest() {
+    @Before
+    fun useNativeSchedulerClock() {
+        // The native scheduler's day and cutoff use the system clock, not RobolectricTest's 2020 clock.
+        TimeManager.reset()
+    }
+
     @Test
     fun `study day changes at local rollover rather than midnight`() {
         val day = 20_000L
@@ -46,8 +53,10 @@ class AnkiquestDecksTest : RobolectricTest() {
         val config = col.decks.configDictForDeckId(1)
         config.new.perDay = 1
         col.decks.save(config)
+        assertEquals(1L, snapshot(1).getLong("remaining"))
         col.sched.answerCard(col.sched.card!!, Rating.EASY)
 
+        assertEquals(1, col.findCards("is:new").size)
         assertEquals(0L, snapshot(1).getLong("remaining"))
         assertEquals(1L, snapshot(1).getLong("reviewed_today"))
     }
