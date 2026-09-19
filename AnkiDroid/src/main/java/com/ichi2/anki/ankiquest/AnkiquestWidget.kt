@@ -198,7 +198,10 @@ class AnkiquestWidget : AppWidgetProvider() {
                 views.setTextViewText(R.id.ankiquest_widget_rank, medals.getOrNull(i) ?: "${i + 1}")
                 views.setTextViewText(R.id.ankiquest_widget_name, entry.getString("display"))
                 views.setTextViewText(R.id.ankiquest_widget_streak, if (streak > 0) "🔥$streak" else "")
-                views.setTextViewText(R.id.ankiquest_widget_level, context.getString(R.string.ankiquest_widget_level, entry.getInt("level")))
+                views.setTextViewText(
+                    R.id.ankiquest_widget_level,
+                    context.getString(R.string.ankiquest_widget_level, entry.getInt("level")),
+                )
                 views.setProgressBar(R.id.ankiquest_widget_bar, 1000, (weekXp * 1000 / leaderXp).toInt(), false)
                 views.setTextViewText(R.id.ankiquest_widget_xp, numbers.format(weekXp))
                 views.setOnClickFillInIntent(R.id.ankiquest_widget_row, Intent())
