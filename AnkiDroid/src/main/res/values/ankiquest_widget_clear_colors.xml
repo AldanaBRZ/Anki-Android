@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ankiquest_widget_clear_text">#FFFFFFFF</color>
+    <color name="ankiquest_widget_clear_text_dim">#E6FFFFFF</color>
+    <color name="ankiquest_widget_clear_self">#33FFFFFF</color>
+    <color name="ankiquest_widget_clear_track">#40FFFFFF</color>
+    <color name="ankiquest_widget_clear_accent">#FFB3D4FF</color>
+    <color name="ankiquest_widget_clear_gold">#FFFFE08A</color>
+</resources>
