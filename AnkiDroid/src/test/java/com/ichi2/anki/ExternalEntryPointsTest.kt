@@ -49,6 +49,7 @@ class ExternalEntryPointsTest : RobolectricTest() {
                 EntryPoint.Receiver("com.ichi2.widget.AddNoteWidget"),
                 EntryPoint.Receiver("com.ichi2.widget.AnkiDroidWidgetSmall"),
                 EntryPoint.Receiver("com.ichi2.anki.ankiquest.AnkiquestWidget"),
+                EntryPoint.Receiver("com.ichi2.anki.ankiquest.AnkiquestTransparentWidget"),
             )
     }
 }
