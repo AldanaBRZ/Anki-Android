@@ -105,6 +105,7 @@ class PreferencesAnalyticsTest : RobolectricTest() {
             R.string.ankiquest_deck_notifications_key,
             R.string.ankiquest_notify_rank_key,
             R.string.ankiquest_streak_hours_key,
+            R.string.ankiquest_nudges_key,
         ).toStringResourceSet()
 
     @Test
