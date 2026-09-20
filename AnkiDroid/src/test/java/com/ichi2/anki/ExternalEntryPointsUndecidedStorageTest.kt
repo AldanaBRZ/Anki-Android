@@ -94,6 +94,7 @@ class ExternalEntryPointsUndecidedStorageTest : RobolectricTest() {
             // the widget host configures a newly added widget
             "com.ichi2.widget.deckpicker.DeckPickerWidgetConfig",
             "com.ichi2.widget.cardanalysis.CardAnalysisWidgetConfig",
+            "com.ichi2.anki.ankiquest.AnkiquestWidgetConfig",
             ->
                 Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 1)
             "com.ichi2.anki.receiver.SdCardReceiver" -> Intent(Intent.ACTION_MEDIA_EJECT, "file:///storage/emulated/0".toUri())

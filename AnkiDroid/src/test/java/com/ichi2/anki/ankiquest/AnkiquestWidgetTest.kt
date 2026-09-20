@@ -15,6 +15,7 @@ import android.widget.TextView
 import androidx.core.widget.RemoteViewsCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
 import org.json.JSONArray
@@ -66,6 +67,36 @@ class AnkiquestWidgetTest : RobolectricTest() {
     }
 
     @Test
+    fun `each period ranks the leaderboard by its own xp`() {
+        val board =
+            JSONArray(
+                listOf(
+                    player("slow", week = 10, day = 99),
+                    player("fast", week = 500, day = 1),
+                ),
+            )
+        assertEquals(listOf("fast", "slow"), AnkiquestWidget.forPeriod(board, "week").names())
+        assertEquals(listOf("slow", "fast"), AnkiquestWidget.forPeriod(board, "day").names())
+        assertEquals(99, AnkiquestWidget.forPeriod(board, "day").getJSONObject(0).getLong("xp"))
+    }
+
+    private fun player(
+        user: String,
+        week: Long,
+        day: Long,
+    ): JSONObject =
+        JSONObject()
+            .put("user", user)
+            .put("display", user)
+            .put("level", 1)
+            .put("streak", 0)
+            .put("xp_total", week)
+            .put("week_xp", week)
+            .put("periods", JSONObject().put("week", week).put("day", day))
+
+    private fun JSONArray.names(): List<String> = (0 until length()).map { getJSONObject(it).getString("user") }
+
+    @Test
     fun `empty leaderboard produces a valid empty collection`() {
         val items = AnkiquestWidget.collection(targetContext, JSONArray())
         assertEquals(0, items.itemCount)
@@ -114,7 +145,7 @@ class AnkiquestWidgetTest : RobolectricTest() {
 
         val application = ApplicationProvider.getApplicationContext<Application>()
         val intent = assertNotNull(shadowOf(application).nextStartedActivity)
-        assertEquals(ComponentName(targetContext, AnkiquestActivity::class.java), intent.component)
+        assertEquals(ComponentName(targetContext, DeckPicker::class.java), intent.component)
     }
 
     @Test
@@ -138,7 +169,7 @@ class AnkiquestWidgetTest : RobolectricTest() {
 
         val application = ApplicationProvider.getApplicationContext<Application>()
         val intent = assertNotNull(shadowOf(application).nextStartedActivity)
-        assertEquals(ComponentName(targetContext, AnkiquestActivity::class.java), intent.component)
+        assertEquals(ComponentName(targetContext, DeckPicker::class.java), intent.component)
     }
 
     private fun populatedWidget(

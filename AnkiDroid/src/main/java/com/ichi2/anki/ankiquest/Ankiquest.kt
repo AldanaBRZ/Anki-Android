@@ -185,16 +185,19 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                 .build(),
         )
 
-    /** Stores the same sharing choice for every deck in [ids] in one request. */
+    /** Shares every deck in [shared] with [recipients] and stops sharing [unshared], in one request. */
     suspend fun saveDeckNotificationSettings(
-        ids: List<String>,
-        enabled: Boolean,
+        shared: List<String>,
+        unshared: List<String>,
         recipients: List<String>,
     ) = withContext(Dispatchers.IO) {
         val (url, user, token) = authenticatedEndpoint()
         val decks = JSONArray()
-        for (id in ids) {
-            decks.put(JSONObject().put("id", id).put("enabled", enabled).put("recipients", JSONArray(recipients)))
+        for (id in shared) {
+            decks.put(JSONObject().put("id", id).put("enabled", true).put("recipients", JSONArray(recipients)))
+        }
+        for (id in unshared) {
+            decks.put(JSONObject().put("id", id).put("enabled", false).put("recipients", JSONArray()))
         }
         execute(
             Request
@@ -211,6 +214,28 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         decks: List<JSONObject>,
         name: String,
     ): List<String> = decks.filter { it.getString("name").startsWith("$name::") }.map { it.getString("id") }
+
+    /** Answers one inbox notification; returns the name of whoever will read it. */
+    suspend fun reply(
+        notification: Long,
+        message: String,
+    ): String =
+        withContext(Dispatchers.IO) {
+            val (url, user, token) = authenticatedEndpoint()
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/reply/$user")
+                    .header("Authorization", "Bearer $token")
+                    .post(
+                        JSONObject()
+                            .put("notification", notification)
+                            .put("message", message)
+                            .toString()
+                            .toRequestBody(json),
+                    ).build(),
+            ).getString("sent_to")
+        }
 
     /** The account key accompanies the response so a settings change cannot mix inbox cursors. */
     suspend fun completionNotifications(): Pair<String, JSONArray>? =
@@ -396,11 +421,28 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         showFeedback: Boolean,
     ) {
         val snapshot = snapshotOf(profile)
-        val message = previous?.let { describe(it, snapshot) }
+        val progress = previous?.let { describe(it, snapshot) }
         previous = snapshot
         app?.let { AnkiquestWidget.requestUpdate(it) }
-        if (showFeedback && message != null) {
+        val announced = announcements(profile)
+        val message =
+            when {
+                announced == null -> progress?.takeIf { showFeedback }
+                progress == null -> announced to true
+                else -> "$announced\n${progress.first}" to true
+            }
+        if (message != null) {
             withContext(Dispatchers.Main) { showBanner(message.first, message.second) }
+        }
+    }
+
+    /** What this upload just told other people about, so finishing a deck is visibly shared. */
+    private fun announcements(profile: JSONObject): String? {
+        val announced = profile.optJSONArray("announced")?.objects().orEmpty()
+        if (announced.isEmpty()) return null
+        return announced.joinToString("\n") {
+            val people = it.getInt("recipients")
+            "\uD83D\uDCE3 ${it.getString("deck")} \u2014 told $people ${if (people == 1) "friend" else "friends"}"
         }
     }
 

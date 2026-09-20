@@ -195,7 +195,7 @@ class AnkiquestUploadTest : RobolectricTest() {
     @Test
     fun `saving for subdecks stores the same choice for each deck in one request`() =
         runBlocking {
-            Ankiquest.saveDeckNotificationSettings(listOf("1", unsharedDeck.toString()), true, listOf("hill"))
+            Ankiquest.saveDeckNotificationSettings(listOf("1", unsharedDeck.toString()), emptyList(), listOf("hill"))
 
             val saves = requests.filter { it.method == "POST" && it.path == "/api/decks/cerro" }
             assertEquals(1, saves.size)
@@ -207,6 +207,18 @@ class AnkiquestUploadTest : RobolectricTest() {
                 assertTrue(deck.getBoolean("enabled"))
                 assertEquals("hill", deck.getJSONArray("recipients").getString(0))
             }
+        }
+
+    @Test
+    fun `stopping sharing is saved alongside the shared decks`() =
+        runBlocking {
+            Ankiquest.saveDeckNotificationSettings(listOf("1"), listOf(unsharedDeck.toString()), listOf("hill"))
+
+            val decks = requests.single { it.method == "POST" && it.path == "/api/decks/cerro" }.body!!.getJSONArray("decks")
+            val byId = (0 until decks.length()).associate { decks.getJSONObject(it).getString("id") to decks.getJSONObject(it) }
+            assertTrue(byId.getValue("1").getBoolean("enabled"))
+            assertFalse(byId.getValue(unsharedDeck.toString()).getBoolean("enabled"))
+            assertEquals(0, byId.getValue(unsharedDeck.toString()).getJSONArray("recipients").length())
         }
 
     @Test
