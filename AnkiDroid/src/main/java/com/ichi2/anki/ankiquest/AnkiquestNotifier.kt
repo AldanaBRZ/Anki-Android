@@ -44,6 +44,10 @@ object AnkiquestNotifier {
     const val DEFAULT_STREAK_HOURS = "2"
 
     private const val CHANNEL = "ankiquest"
+
+    /** Its own channel because it vibrates, and a channel cannot be changed once made. */
+    private const val NUDGE_CHANNEL = "ankiquestNudges"
+    private val BUZZ = longArrayOf(0, 250, 150, 250)
     private const val ORDER_KEY = "ankiquestLastOrder"
     private const val STREAK_DAY_KEY = "ankiquestStreakNotifiedDay"
     private const val RANK_ID = 5_130_001
@@ -79,6 +83,7 @@ object AnkiquestNotifier {
                     body,
                     dashboardIntent(context),
                     if (answerable) AnkiquestReply.actions(context, id, tag, title, body) else emptyList(),
+                    entry.optString("kind") == "nudge",
                 )
             ) {
                 return
@@ -205,6 +210,7 @@ object AnkiquestNotifier {
         body: String,
         open: Intent,
         actions: List<NotificationCompat.Action> = emptyList(),
+        buzz: Boolean = false,
     ): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -213,21 +219,29 @@ object AnkiquestNotifier {
         }
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return false
+        val channel = if (buzz) NUDGE_CHANNEL else CHANNEL
         manager.createNotificationChannel(
             NotificationChannelCompat
-                .Builder(CHANNEL, NotificationManagerCompat.IMPORTANCE_DEFAULT)
-                .setName(context.getString(R.string.ankiquest_screen_title))
+                .Builder(channel, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                .setName(
+                    context.getString(
+                        if (buzz) R.string.ankiquest_nudges_title else R.string.ankiquest_screen_title,
+                    ),
+                ).setVibrationEnabled(buzz)
+                .setVibrationPattern(if (buzz) BUZZ else null)
                 .build(),
         )
-        if (manager.getNotificationChannel(CHANNEL)?.importance == NotificationManagerCompat.IMPORTANCE_NONE) return false
+        if (manager.getNotificationChannel(channel)?.importance == NotificationManagerCompat.IMPORTANCE_NONE) return false
         val notification =
             NotificationCompat
-                .Builder(context, CHANNEL)
+                .Builder(context, channel)
                 .setSmallIcon(R.drawable.ic_star_notify)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
+                // Android 7 and older have no channels; the notification itself buzzes.
+                .setVibrate(if (buzz) BUZZ else null)
                 .setContentIntent(
                     PendingIntent.getActivity(
                         context,

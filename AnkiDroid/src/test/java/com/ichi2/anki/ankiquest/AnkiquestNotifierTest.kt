@@ -19,7 +19,9 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [32])
@@ -112,6 +114,45 @@ class AnkiquestNotifierTest : RobolectricTest() {
         assertEquals(1, shadowOf(manager).size(), "the same notification is updated in place")
         assertEquals("Could not send \u201cGood job!\u201d. Tap a button to try again.", failed.extras.getString(Notification.EXTRA_TEXT))
         assertEquals(listOf("Good job!", "Reply"), failed.actions.map { it.title.toString() })
+    }
+
+    @Test
+    fun `a nudge buzzes on its own channel while the rest stay quiet`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiquestNotifier.onDeckCompletions(
+            targetContext,
+            "server/cerro",
+            JSONArray()
+                .put(message(1, 30).put("kind", "completion"))
+                .put(message(2, 30).put("kind", "nudge").put("title", "Keep going")),
+        )
+
+        assertEquals("ankiquest", shadowOf(manager).getNotification(5_140_001).channelId)
+        assertEquals("ankiquestNudges", shadowOf(manager).getNotification(5_140_002).channelId)
+        assertTrue(manager.getNotificationChannel("ankiquestNudges").shouldVibrate())
+        assertFalse(
+            manager.getNotificationChannel("ankiquest").shouldVibrate(),
+            "the rest stay as quiet as they were",
+        )
+    }
+
+    @Test
+    @Config(sdk = [24])
+    fun `a nudge carries its own buzz where there are no channels`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiquestNotifier.onDeckCompletions(
+            targetContext,
+            "server/cerro",
+            JSONArray()
+                .put(message(1, 30).put("kind", "completion"))
+                .put(message(2, 30).put("kind", "nudge")),
+        )
+
+        assertNull(shadowOf(manager).getNotification(5_140_001).vibrate)
+        assertEquals(
+            listOf(0L, 250L, 150L, 250L),
+            shadowOf(manager).getNotification(5_140_002).vibrate?.toList(),
+        )
     }
 
     private fun message(
