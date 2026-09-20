@@ -140,6 +140,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
 
     @Test
     @Config(sdk = [24])
+    @Suppress("DEPRECATION") // Notification.vibrate is how a pre-O phone buzzes
     fun `a nudge carries its own buzz where there are no channels`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         AnkiquestNotifier.onDeckCompletions(
