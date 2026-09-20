@@ -33,6 +33,8 @@ import timber.log.Timber
 
 /** Answering a deck completion from its notification: a canned cheer, or your own words. */
 object AnkiquestReply {
+    enum class Outcome { SENT, RETRY, FAILED }
+
     const val NOTIFICATION_KEY = "notification"
     const val TAG_KEY = "tag"
     const val TITLE_KEY = "title"
@@ -135,18 +137,19 @@ object AnkiquestReply {
         context: Context,
         data: Data,
         attempt: Int,
-    ): Boolean {
+    ): Outcome {
         val message = data.getString(MESSAGE_KEY).orEmpty()
         val notification = data.getLong(NOTIFICATION_KEY, 0)
-        if (message.isEmpty() || notification <= 0) return true
+        if (message.isEmpty() || notification <= 0) return Outcome.FAILED
         return try {
-            val who = Ankiquest.reply(notification, message)
-            AnkiquestNotifier.onReplySent(context, data, who)
-            true
+            AnkiquestNotifier.onReplySent(context, data, Ankiquest.reply(notification, message))
+            Outcome.SENT
         } catch (e: Exception) {
             Timber.w(e, "ankiquest reply failed")
-            if (attempt + 1 >= ATTEMPTS) AnkiquestNotifier.onReplyFailed(context, data)
-            false
+            // A refused reply stays refused; only a broken connection is worth another try.
+            val done = e is Ankiquest.Rejected || attempt + 1 >= ATTEMPTS
+            if (done) AnkiquestNotifier.onReplyFailed(context, data)
+            if (done) Outcome.FAILED else Outcome.RETRY
         }
     }
 }
@@ -167,9 +170,9 @@ class AnkiquestReplyWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result =
-        when {
-            AnkiquestReply.run(applicationContext, inputData, runAttemptCount) -> Result.success()
-            runAttemptCount + 1 >= AnkiquestReply.ATTEMPTS -> Result.failure()
-            else -> Result.retry()
+        when (AnkiquestReply.run(applicationContext, inputData, runAttemptCount)) {
+            AnkiquestReply.Outcome.SENT -> Result.success()
+            AnkiquestReply.Outcome.RETRY -> Result.retry()
+            AnkiquestReply.Outcome.FAILED -> Result.failure()
         }
 }

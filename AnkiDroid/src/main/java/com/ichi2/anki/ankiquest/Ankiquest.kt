@@ -215,6 +215,11 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         name: String,
     ): List<String> = decks.filter { it.getString("name").startsWith("$name::") }.map { it.getString("id") }
 
+    /** A reply the server will never take, such as one already answered elsewhere. */
+    class Rejected(
+        val code: Int,
+    ) : IOException("HTTP $code")
+
     /** Answers one inbox notification; returns the name of whoever will read it. */
     suspend fun reply(
         notification: Long,
@@ -222,7 +227,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     ): String =
         withContext(Dispatchers.IO) {
             val (url, user, token) = authenticatedEndpoint()
-            execute(
+            val request =
                 Request
                     .Builder()
                     .url("$url/api/reply/$user")
@@ -233,8 +238,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                             .put("message", message)
                             .toString()
                             .toRequestBody(json),
-                    ).build(),
-            ).getString("sent_to")
+                    ).build()
+            try {
+                execute(request).getString("sent_to")
+            } catch (e: HttpStatusException) {
+                throw if (e.code in 400..499) Rejected(e.code) else e
+            }
         }
 
     /** The account key accompanies the response so a settings change cannot mix inbox cursors. */
