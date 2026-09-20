@@ -16,12 +16,8 @@ package com.ichi2.anki.preferences
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import android.widget.CheckBox
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
@@ -74,110 +70,6 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         bindAction(R.string.ankiquest_check_updates_key) { AnkiquestUpdater.checkNow(requireActivity()) }
     }
 
-    private fun showDeckNotifications(settings: JSONObject) {
-        val rows = settings.getJSONArray("decks")
-        if (rows.length() == 0) {
-            AlertDialog
-                .Builder(requireContext())
-                .setMessage(R.string.ankiquest_deck_notifications_empty)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
-        }
-        val decks = (0 until rows.length()).map { rows.getJSONObject(it) }
-        AlertDialog
-            .Builder(requireContext())
-            .setTitle(R.string.ankiquest_deck_notifications_title)
-            .setItems(decks.map { it.getString("name") }.toTypedArray()) { _, index ->
-                editDeckNotifications(decks[index], settings)
-            }.setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun editDeckNotifications(
-        deck: JSONObject,
-        settings: JSONObject,
-    ) {
-        val context = requireContext()
-        val rows = settings.getJSONArray("recipients")
-        val people = (0 until rows.length()).map { rows.getJSONObject(it) }
-        val selected = deck.getJSONArray("recipients")
-        val selectedIds = (0 until selected.length()).map { selected.getString(it) }.toSet()
-        val allDecks = settings.getJSONArray("decks").let { list -> (0 until list.length()).map { list.getJSONObject(it) } }
-        val subdecks = Ankiquest.subdeckIds(allDecks, deck.getString("name"))
-        val includeSubdecks =
-            CheckBox(context).apply {
-                text = resources.getQuantityString(R.plurals.ankiquest_deck_notifications_subdecks, subdecks.size, subdecks.size)
-            }
-        val checked = people.map { it.getString("user") in selectedIds }.toBooleanArray()
-        val enabled =
-            SwitchCompat(context).apply {
-                setText(R.string.ankiquest_deck_notifications_enabled)
-                isChecked = deck.getBoolean("enabled")
-            }
-        val content =
-            LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                val padding = (24 * resources.displayMetrics.density).toInt()
-                setPadding(padding, padding / 2, padding, 0)
-                addView(enabled)
-                if (subdecks.isNotEmpty()) addView(includeSubdecks)
-                addView(
-                    TextView(context).apply {
-                        setText(
-                            if (people.isEmpty()) {
-                                R.string.ankiquest_deck_notifications_no_people
-                            } else {
-                                R.string.ankiquest_deck_notifications_help
-                            },
-                        )
-                    },
-                )
-            }
-        val dialog =
-            AlertDialog
-                .Builder(context)
-                .setTitle(deck.getString("name"))
-                .setView(content)
-                .setMultiChoiceItems(
-                    people.map { "${it.getString("display")} (${it.getString("user")})" }.toTypedArray(),
-                    checked,
-                ) { _, index, value -> checked[index] = value }
-                .setPositiveButton(R.string.ankiquest_deck_notifications_save, null)
-                .setNegativeButton(android.R.string.cancel, null)
-                .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val recipients = people.filterIndexed { index, _ -> checked[index] }.map { it.getString("user") }
-                if (enabled.isChecked && recipients.isEmpty()) {
-                    AlertDialog
-                        .Builder(context)
-                        .setMessage(R.string.ankiquest_deck_notifications_choose_people)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
-                    return@setOnClickListener
-                }
-                val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                save.isEnabled = false
-                lifecycleScope.launch {
-                    try {
-                        val ids = listOf(deck.getString("id")) + if (includeSubdecks.isChecked) subdecks else emptyList()
-                        Ankiquest.saveDeckNotificationSettings(ids, enabled.isChecked, recipients)
-                        dialog.dismiss()
-                    } catch (e: Exception) {
-                        save.isEnabled = true
-                        AlertDialog
-                            .Builder(context)
-                            .setMessage(getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName))
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show()
-                    }
-                }
-            }
-        }
-        dialog.show()
-    }
-
     private fun bindAction(
         key: Int,
         action: suspend () -> String?,
@@ -206,6 +98,142 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                     .show()
             }
             true
+        }
+    }
+
+    private fun showDeckNotifications(settings: JSONObject) {
+        val context = requireContext()
+        val rows = settings.getJSONArray("decks")
+        if (rows.length() == 0) {
+            AlertDialog
+                .Builder(context)
+                .setMessage(R.string.ankiquest_deck_notifications_empty)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+        val decks = (0 until rows.length()).map { rows.getJSONObject(it) }
+        val checked = decks.map { it.getBoolean("enabled") }.toBooleanArray()
+        val dialog =
+            AlertDialog
+                .Builder(context)
+                .setTitle(R.string.ankiquest_deck_notifications_title)
+                .setMultiChoiceItems(
+                    decks.map { it.getString("name") }.toTypedArray(),
+                    checked,
+                ) { shown, index, value ->
+                    checked[index] = value
+                    for (id in Ankiquest.subdeckIds(decks, decks[index].getString("name"))) {
+                        val child = decks.indexOfFirst { it.getString("id") == id }
+                        if (child < 0) continue
+                        checked[child] = value
+                        (shown as AlertDialog).listView.setItemChecked(child, value)
+                    }
+                }.setPositiveButton(R.string.ankiquest_deck_notifications_next, null)
+                .setNeutralButton(R.string.ankiquest_deck_notifications_select_all, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val select = checked.any { !it }
+                for (index in checked.indices) {
+                    checked[index] = select
+                    dialog.listView.setItemChecked(index, select)
+                }
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val shared = decks.filterIndexed { index, _ -> checked[index] }
+                val unshared = decks.filterIndexed { index, _ -> !checked[index] }
+                dialog.dismiss()
+                chooseRecipients(settings, shared, unshared)
+            }
+        }
+        dialog.show()
+    }
+
+    /** Asks once who should hear about every newly shared deck. */
+    private fun chooseRecipients(
+        settings: JSONObject,
+        shared: List<JSONObject>,
+        unshared: List<JSONObject>,
+    ) {
+        val context = requireContext()
+        val ids = { decks: List<JSONObject> -> decks.map { it.getString("id") } }
+        if (shared.isEmpty()) {
+            saveDeckSharing(emptyList(), ids(unshared), emptyList())
+            return
+        }
+        val rows = settings.getJSONArray("recipients")
+        val people = (0 until rows.length()).map { rows.getJSONObject(it) }
+        if (people.isEmpty()) {
+            AlertDialog
+                .Builder(context)
+                .setMessage(R.string.ankiquest_deck_notifications_no_people)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+        val chosen =
+            shared
+                .flatMap { deck ->
+                    deck.getJSONArray("recipients").let { list -> (0 until list.length()).map { list.getString(it) } }
+                }.toSet()
+        val checked = people.map { it.getString("user") in chosen }.toBooleanArray()
+        val dialog =
+            AlertDialog
+                .Builder(context)
+                .setTitle(R.string.ankiquest_deck_notifications_people_title)
+                .setMultiChoiceItems(
+                    people.map { "${it.getString("display")} (${it.getString("user")})" }.toTypedArray(),
+                    checked,
+                ) { _, index, value -> checked[index] = value }
+                .setPositiveButton(R.string.ankiquest_deck_notifications_save, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val recipients = people.filterIndexed { index, _ -> checked[index] }.map { it.getString("user") }
+                if (recipients.isEmpty()) {
+                    AlertDialog
+                        .Builder(context)
+                        .setMessage(R.string.ankiquest_deck_notifications_choose_people)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                    return@setOnClickListener
+                }
+                dialog.dismiss()
+                saveDeckSharing(ids(shared), ids(unshared), recipients)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun saveDeckSharing(
+        shared: List<String>,
+        unshared: List<String>,
+        recipients: List<String>,
+    ) {
+        val context = requireContext()
+        lifecycleScope.launch {
+            try {
+                Ankiquest.saveDeckNotificationSettings(shared, unshared, recipients)
+                AlertDialog
+                    .Builder(context)
+                    .setMessage(
+                        resources.getQuantityString(
+                            R.plurals.ankiquest_deck_notifications_saved,
+                            shared.size,
+                            shared.size,
+                        ),
+                    ).setPositiveButton(android.R.string.ok, null)
+                    .show()
+            } catch (e: Exception) {
+                AlertDialog
+                    .Builder(context)
+                    .setMessage(getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
         }
     }
 

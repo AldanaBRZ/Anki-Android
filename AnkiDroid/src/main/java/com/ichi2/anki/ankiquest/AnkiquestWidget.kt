@@ -25,12 +25,17 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.DrawableRes
 import androidx.annotation.LayoutRes
+import androidx.annotation.StringRes
 import androidx.core.app.PendingIntentCompat
+import androidx.core.content.edit
 import androidx.core.widget.RemoteViewsCompat
 import androidx.core.widget.RemoteViewsCompat.RemoteCollectionItems
+import com.ichi2.anki.AnkiDroidApp
+import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.common.time.TimeManager
 import org.json.JSONArray
+import org.json.JSONObject
 import java.text.NumberFormat
 
 /** Scrollable homescreen leaderboard. Tapping the header or a player opens the dashboard. */
@@ -63,7 +68,54 @@ open class AnkiquestWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.ichi2.anki.ankiquest.WIDGET_REFRESH"
         private const val MIN_REFRESH_MS = 30 * 1000L
+        private const val PERIOD_KEY = "ankiquestWidgetPeriod"
         private val medals = arrayOf("👑", "🥈", "🥉")
+
+        /** The leaderboard periods a widget can show, as served by the ankiquest API. */
+        class Period(
+            val name: String,
+            @StringRes val label: Int,
+        )
+
+        val PERIODS =
+            listOf(
+                Period("hour", R.string.ankiquest_period_hour),
+                Period("day", R.string.ankiquest_period_day),
+                Period("week", R.string.ankiquest_period_week),
+                Period("month", R.string.ankiquest_period_month),
+                Period("year", R.string.ankiquest_period_year),
+                Period("all", R.string.ankiquest_period_all),
+            )
+
+        fun periodOf(
+            context: Context,
+            widgetId: Int,
+        ): String = AnkiDroidApp.sharedPrefs().getString("$PERIOD_KEY:$widgetId", null) ?: "week"
+
+        fun setPeriod(
+            context: Context,
+            widgetId: Int,
+            period: String,
+        ) {
+            AnkiDroidApp.sharedPrefs().edit { putString("$PERIOD_KEY:$widgetId", period) }
+            AnkiquestPoll.refreshNow(context)
+        }
+
+        /** Orders [board] by the XP of [period], falling back to the week for older servers. */
+        internal fun forPeriod(
+            board: JSONArray,
+            period: String,
+        ): JSONArray {
+            val entries = (0 until board.length()).map { board.getJSONObject(it) }
+            val xpOf = { entry: JSONObject ->
+                entry.optJSONObject("periods")?.optLong(period) ?: entry.optLong("week_xp")
+            }
+            val ordered = JSONArray()
+            entries
+                .sortedWith(compareByDescending(xpOf).thenByDescending { it.optLong("xp_total") })
+                .forEach { ordered.put(JSONObject(it.toString()).put("xp", xpOf(it))) }
+            return ordered
+        }
 
         internal class Style(
             val provider: Class<out AnkiquestWidget>,
@@ -107,6 +159,8 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 .getInstance(context)
                 .getAppWidgetIds(ComponentName(context, style.provider))
 
+        private fun ankiHome(context: Context): Intent = Intent(context, DeckPicker::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
         private fun showRefreshing(context: Context) {
             for (style in styles) {
                 val ids = widgetIds(context, style)
@@ -134,9 +188,11 @@ open class AnkiquestWidget : AppWidgetProvider() {
             for (style in styles) {
                 val ids = widgetIds(context, style)
                 if (ids.isEmpty()) continue
-                val items = collection(context, board ?: JSONArray(), style)
                 for (id in ids) {
-                    val views = layout(context, board, fetchedAt, offline, style)
+                    val period = periodOf(context, id)
+                    val ranked = board?.let { forPeriod(it, period) }
+                    val items = collection(context, ranked ?: JSONArray(), style)
+                    val views = layout(context, ranked, fetchedAt, offline, style, period)
                     // Each placed widget needs its own adapter ID, including transparent ones.
                     RemoteViewsCompat.setRemoteAdapter(context, views, id, R.id.ankiquest_widget_list, items)
                     manager.updateAppWidget(id, views)
@@ -150,14 +206,19 @@ open class AnkiquestWidget : AppWidgetProvider() {
             fetchedAt: Long,
             offline: Boolean,
             style: Style = styles.first(),
+            period: String = "week",
         ): RemoteViews {
             val views = RemoteViews(context.packageName, style.layout)
+            views.setTextViewText(
+                R.id.ankiquest_widget_period,
+                context.getString(PERIODS.first { it.name == period }.label),
+            )
             views.setOnClickPendingIntent(
                 R.id.ankiquest_widget_root,
                 PendingIntent.getActivity(
                     context,
                     0,
-                    Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    ankiHome(context),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
@@ -166,7 +227,7 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 PendingIntentCompat.getActivity(
                     context,
                     2,
-                    Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    ankiHome(context),
                     PendingIntent.FLAG_UPDATE_CURRENT,
                     true,
                 ),

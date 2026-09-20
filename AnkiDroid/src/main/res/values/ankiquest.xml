@@ -3,15 +3,27 @@
     <string name="ankiquest_deck_notifications_key" translatable="false">ankiquestDeckNotifications</string>
     <string name="ankiquest_deck_notifications_title" translatable="false" maxLength="41">Deck completion notifications</string>
     <string name="ankiquest_deck_notifications_summary" translatable="false">Choose who hears when you finish a deck for the day</string>
-    <string name="ankiquest_deck_notifications_enabled" translatable="false">Share this deck’s daily completion</string>
-    <string name="ankiquest_deck_notifications_help" translatable="false">Select the people to notify, once per study day. Subdecks count toward completion, including learning due later today. Changes apply to future completions.</string>
     <string name="ankiquest_deck_notifications_empty" translatable="false">Create a regular deck first to set up completion notifications.</string>
     <string name="ankiquest_deck_notifications_no_people" translatable="false">There are no other players on this server yet.</string>
     <string name="ankiquest_deck_notifications_choose_people" translatable="false">Select at least one person, or switch sharing off.</string>
     <string name="ankiquest_deck_notifications_save" translatable="false">Save</string>
-    <plurals name="ankiquest_deck_notifications_subdecks" translatable="false">
-        <item quantity="one">Also apply to its %d subdeck</item>
-        <item quantity="other">Also apply to all %d subdecks</item>
+    <string name="ankiquest_reply" translatable="false">Reply</string>
+    <string name="ankiquest_reply_cheer" translatable="false">Good job!</string>
+    <string name="ankiquest_reply_hint" translatable="false">Say something nice</string>
+    <string name="ankiquest_reply_sent" translatable="false">Sent to %1$s: %2$s</string>
+    <string name="ankiquest_reply_failed" translatable="false">Could not send \u201c%1$s\u201d. Tap a button to try again.</string>
+    <string-array name="ankiquest_reply_choices" translatable="false">
+        <item>Good job!</item>
+        <item>Nice one \ud83d\udd25</item>
+        <item>Keep it up!</item>
+    </string-array>
+    <string name="ankiquest_deck_notifications_next" translatable="false">Next</string>
+    <string name="ankiquest_deck_notifications_select_all" translatable="false">All / none</string>
+    <string name="ankiquest_deck_notifications_people_title" translatable="false">Notify these people</string>
+    <plurals name="ankiquest_deck_notifications_saved" translatable="false">
+        <item quantity="zero">No decks are shared any more.</item>
+        <item quantity="one">%d deck is shared.</item>
+        <item quantity="other">%d decks are shared.</item>
     </plurals>
     <string name="ankiquest_screen_key" translatable="false">ankiquestScreen</string>
     <string name="ankiquest_screen_title" translatable="false" maxLength="41">ankiquest</string>
@@ -73,7 +85,13 @@
         <item>4</item>
         <item>6</item>
     </string-array>
-    <string name="ankiquest_widget_this_week" translatable="false">this week</string>
+    <string name="ankiquest_period_hour" translatable="false">this hour</string>
+    <string name="ankiquest_period_day" translatable="false">today</string>
+    <string name="ankiquest_period_week" translatable="false">this week</string>
+    <string name="ankiquest_period_month" translatable="false">this month</string>
+    <string name="ankiquest_period_year" translatable="false">this year</string>
+    <string name="ankiquest_period_all" translatable="false">all time</string>
+    <string name="ankiquest_widget_period_title" translatable="false">Which leaderboard?</string>
     <string name="ankiquest_widget_refresh" translatable="false">Refresh</string>
     <string name="ankiquest_widget_offline_at" translatable="false">offline · %1$s</string>
     <string name="ankiquest_update_title" translatable="false">%1$s available</string>

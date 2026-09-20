@@ -27,12 +27,13 @@
             android:textSize="15sp" />
 
         <TextView
+            android:id="@+id/ankiquest_widget_period"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:singleLine="true"
-            android:text="@string/ankiquest_widget_this_week"
+            android:text="@string/ankiquest_period_week"
             android:textColor="@color/ankiquest_widget_text_dim"
             android:textSize="12sp" />
 

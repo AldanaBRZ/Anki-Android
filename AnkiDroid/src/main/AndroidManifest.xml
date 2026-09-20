@@ -543,6 +543,18 @@
             android:exported="false" />
 
         <receiver
+            android:name="com.ichi2.anki.ankiquest.AnkiquestReplyReceiver"
+            android:exported="false" />
+
+        <activity
+            android:name="com.ichi2.anki.ankiquest.AnkiquestWidgetConfig"
+            android:label="@string/ankiquest_widget_period_title"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <receiver
             android:name="com.ichi2.anki.ankiquest.AnkiquestWidget"
             android:label="@string/ankiquest_widget_label"
             android:exported="true">

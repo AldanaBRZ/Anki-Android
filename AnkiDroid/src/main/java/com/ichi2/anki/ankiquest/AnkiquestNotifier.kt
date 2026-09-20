@@ -26,6 +26,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.work.Data
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.R
 import com.ichi2.anki.common.time.TimeManager
@@ -66,13 +67,18 @@ object AnkiquestNotifier {
             if (id <= previous) continue
             // Show recent completions even on the first poll, but never replay an old backlog.
             val fresh = AnkiquestCompletionPolicy.freshNotification(entry.optLong("created_at"), now)
+            val tag = 5_140_000 + (id % 1_000_000).toInt()
+            val title = entry.getString("title")
+            val body = entry.getString("body")
+            val answerable = entry.optString("sender").isNotEmpty() && !entry.optBoolean("replied")
             if (fresh &&
                 !notify(
                     context,
-                    5_140_000 + (id % 1_000_000).toInt(),
-                    entry.getString("title"),
-                    entry.getString("body"),
+                    tag,
+                    title,
+                    body,
                     dashboardIntent(context),
+                    if (answerable) AnkiquestReply.actions(context, id, tag, title, body) else emptyList(),
                 )
             ) {
                 return
@@ -153,6 +159,41 @@ object AnkiquestNotifier {
         notify(context, STREAK_ID, "🔥 Your $streak day streak ends in ${left}h", body, open)
     }
 
+    /** Replaces the answered notification with what was said, so the reply is visibly gone. */
+    fun onReplySent(
+        context: Context,
+        data: Data,
+        who: String,
+    ) {
+        val message = data.getString(AnkiquestReply.MESSAGE_KEY).orEmpty()
+        notify(
+            context,
+            data.getInt(AnkiquestReply.TAG_KEY, 0),
+            data.getString(AnkiquestReply.TITLE_KEY).orEmpty(),
+            context.getString(R.string.ankiquest_reply_sent, who, message),
+            dashboardIntent(context),
+        )
+    }
+
+    /** Keeps the buttons so a reply that never left can be sent again. */
+    fun onReplyFailed(
+        context: Context,
+        data: Data,
+    ) {
+        val tag = data.getInt(AnkiquestReply.TAG_KEY, 0)
+        val title = data.getString(AnkiquestReply.TITLE_KEY).orEmpty()
+        val body = data.getString(AnkiquestReply.BODY_KEY).orEmpty()
+        val message = data.getString(AnkiquestReply.MESSAGE_KEY).orEmpty()
+        notify(
+            context,
+            tag,
+            title,
+            context.getString(R.string.ankiquest_reply_failed, message),
+            dashboardIntent(context),
+            AnkiquestReply.actions(context, data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0), tag, title, body),
+        )
+    }
+
     private fun dashboardIntent(context: Context): Intent =
         Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
@@ -163,6 +204,7 @@ object AnkiquestNotifier {
         title: String,
         body: String,
         open: Intent,
+        actions: List<NotificationCompat.Action> = emptyList(),
     ): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -193,7 +235,8 @@ object AnkiquestNotifier {
                         open,
                         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                     ),
-                ).build()
+                ).apply { actions.forEach { addAction(it) } }
+                .build()
         manager.notify(id, notification)
         return true
     }

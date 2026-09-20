@@ -4,6 +4,7 @@ package com.ichi2.anki.ankiquest
 
 import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Data
 import anki.scheduler.CardAnswer.Rating
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.EmptyApplicationCategory
@@ -43,6 +44,9 @@ class AnkiquestUploadTest : RobolectricTest() {
     @Volatile
     private var settingsStatus = 200
 
+    @Volatile
+    private var replyStatus = 200
+
     private data class UploadRequest(
         val method: String,
         val path: String,
@@ -70,10 +74,22 @@ class AnkiquestUploadTest : RobolectricTest() {
                 ),
             )
             val settings = path.startsWith("/api/decks/")
-            val response = if (settings) deckSettings() else profile()
+            val answering = path.startsWith("/api/reply/")
+            val response =
+                when {
+                    settings -> deckSettings()
+                    answering -> JSONObject().put("sent_to", "Hill")
+                    else -> profile()
+                }
             val bytes = response.toString().toByteArray(Charsets.UTF_8)
             exchange.responseHeaders.set("Content-Type", "application/json")
-            exchange.sendResponseHeaders(if (settings) settingsStatus else 200, bytes.size.toLong())
+            val status =
+                when {
+                    settings -> settingsStatus
+                    answering -> replyStatus
+                    else -> 200
+                }
+            exchange.sendResponseHeaders(status, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
         }
         server.start()
@@ -90,6 +106,42 @@ class AnkiquestUploadTest : RobolectricTest() {
         if (::server.isInitialized) server.stop(0)
         AnkiDroidApp.sharedPreferencesTestingOverride = null
     }
+
+    @Test
+    fun `a reply carries the message to the server and names who heard it`() =
+        runBlocking {
+            assertEquals("Hill", Ankiquest.reply(7, "Good job!"))
+
+            val sent = requests.single { it.path == "/api/reply/cerro" }
+            assertEquals("POST", sent.method)
+            assertEquals("Bearer first-token", sent.authorization)
+            assertEquals(7L, sent.body!!.getLong("notification"))
+            assertEquals("Good job!", sent.body.getString("message"))
+        }
+
+    @Test
+    fun `a refused reply is reported at once and a broken one is retried`() =
+        runBlocking {
+            val data =
+                Data
+                    .Builder()
+                    .putLong(AnkiquestReply.NOTIFICATION_KEY, 7)
+                    .putInt(AnkiquestReply.TAG_KEY, 5_140_007)
+                    .putString(AnkiquestReply.TITLE_KEY, "Deck complete")
+                    .putString(AnkiquestReply.BODY_KEY, "Cerro has finished Spanish for today.")
+                    .putString(AnkiquestReply.MESSAGE_KEY, "Good job!")
+                    .build()
+            assertEquals(AnkiquestReply.Outcome.SENT, AnkiquestReply.run(targetContext, data, 0))
+
+            replyStatus = 404
+            assertEquals(AnkiquestReply.Outcome.FAILED, AnkiquestReply.run(targetContext, data, 0))
+            replyStatus = 503
+            assertEquals(AnkiquestReply.Outcome.RETRY, AnkiquestReply.run(targetContext, data, 0))
+            assertEquals(
+                AnkiquestReply.Outcome.FAILED,
+                AnkiquestReply.run(targetContext, data, AnkiquestReply.ATTEMPTS - 1),
+            )
+        }
 
     @Test
     fun `notification settings sends an explicit complete catalog`() =
@@ -195,7 +247,7 @@ class AnkiquestUploadTest : RobolectricTest() {
     @Test
     fun `saving for subdecks stores the same choice for each deck in one request`() =
         runBlocking {
-            Ankiquest.saveDeckNotificationSettings(listOf("1", unsharedDeck.toString()), true, listOf("hill"))
+            Ankiquest.saveDeckNotificationSettings(listOf("1", unsharedDeck.toString()), emptyList(), listOf("hill"))
 
             val saves = requests.filter { it.method == "POST" && it.path == "/api/decks/cerro" }
             assertEquals(1, saves.size)
@@ -207,6 +259,18 @@ class AnkiquestUploadTest : RobolectricTest() {
                 assertTrue(deck.getBoolean("enabled"))
                 assertEquals("hill", deck.getJSONArray("recipients").getString(0))
             }
+        }
+
+    @Test
+    fun `stopping sharing is saved alongside the shared decks`() =
+        runBlocking {
+            Ankiquest.saveDeckNotificationSettings(listOf("1"), listOf(unsharedDeck.toString()), listOf("hill"))
+
+            val decks = requests.single { it.method == "POST" && it.path == "/api/decks/cerro" }.body!!.getJSONArray("decks")
+            val byId = (0 until decks.length()).associate { decks.getJSONObject(it).getString("id") to decks.getJSONObject(it) }
+            assertTrue(byId.getValue("1").getBoolean("enabled"))
+            assertFalse(byId.getValue(unsharedDeck.toString()).getBoolean("enabled"))
+            assertEquals(0, byId.getValue(unsharedDeck.toString()).getJSONArray("recipients").length())
         }
 
     @Test
