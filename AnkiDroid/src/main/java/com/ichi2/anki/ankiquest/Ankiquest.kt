@@ -209,6 +209,31 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         )
     }
 
+    /** Whether the server sends this player nudges, without touching deck progress. */
+    suspend fun nudgesEnabled(): Boolean =
+        withContext(Dispatchers.IO) {
+            val (url, user, token) = authenticatedEndpoint()
+            fetchDeckNotificationSettings(url, user, token).optBoolean("nudges")
+        }
+
+    suspend fun setNudges(enabled: Boolean) =
+        withContext(Dispatchers.IO) {
+            val (url, user, token) = authenticatedEndpoint()
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/decks/$user")
+                    .header("Authorization", "Bearer $token")
+                    .post(
+                        JSONObject()
+                            .put("decks", JSONArray())
+                            .put("nudges", enabled)
+                            .toString()
+                            .toRequestBody(json),
+                    ).build(),
+            )
+        }
+
     /** The ids of every deck nested below the deck called [name] in the settings deck list. */
     fun subdeckIds(
         decks: List<JSONObject>,

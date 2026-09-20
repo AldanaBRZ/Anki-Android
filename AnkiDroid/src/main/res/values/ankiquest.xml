@@ -8,6 +8,13 @@
     <string name="ankiquest_deck_notifications_choose_people" translatable="false">Select at least one person, or switch sharing off.</string>
     <string name="ankiquest_deck_notifications_save" translatable="false">Save</string>
     <string name="ankiquest_reply" translatable="false">Reply</string>
+    <string name="ankiquest_nudges_key" translatable="false">ankiquestNudges</string>
+    <string name="ankiquest_nudges_title" translatable="false" maxLength="41">Nudges</string>
+    <string name="ankiquest_nudges_summary" translatable="false">Tell me when a place, my best day or the next level is within reach</string>
+    <string name="ankiquest_nudges_unavailable" translatable="false">Set the server, player and token first</string>
+    <string name="ankiquest_deck_collapse" translatable="false">Collapse subdecks</string>
+    <string name="ankiquest_deck_expand" translatable="false">Expand subdecks</string>
+    <string name="ankiquest_deck_apply_subdecks" translatable="false">Apply to subdecks</string>
     <string name="ankiquest_reply_cheer" translatable="false">Good job!</string>
     <string name="ankiquest_reply_hint" translatable="false">Say something nice</string>
     <string name="ankiquest_reply_sent" translatable="false">Sent to %1$s: %2$s</string>

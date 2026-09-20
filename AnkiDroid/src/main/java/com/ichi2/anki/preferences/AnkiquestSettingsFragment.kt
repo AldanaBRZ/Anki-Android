@@ -24,8 +24,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.ichi2.anki.R
 import com.ichi2.anki.ankiquest.Ankiquest
+import com.ichi2.anki.ankiquest.AnkiquestDeckAdapter
+import com.ichi2.anki.ankiquest.AnkiquestDeckTree
 import com.ichi2.anki.ankiquest.AnkiquestUpdater
 import com.ichi2.preferences.VersatileTextPreference
 import kotlinx.coroutines.launch
@@ -52,6 +56,7 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             if (hours != "0") askForNotifications()
             true
         }
+        bindNudges()
         bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
         bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
         bindAction(R.string.ankiquest_deck_notifications_key) {
@@ -68,6 +73,40 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 AnkiquestUpdater.installed() ?: getString(R.string.ankiquest_local_build),
             )
         bindAction(R.string.ankiquest_check_updates_key) { AnkiquestUpdater.checkNow(requireActivity()) }
+    }
+
+    /** The nudge setting lives on the server, so the switch mirrors it instead of a preference. */
+    private fun bindNudges() {
+        val preference = requirePreference<SwitchPreferenceCompat>(R.string.ankiquest_nudges_key)
+        preference.isPersistent = false
+        preference.isEnabled = false
+        lifecycleScope.launch {
+            val current = runCatching { Ankiquest.nudgesEnabled() }.getOrNull()
+            if (current == null) {
+                preference.summary = getString(R.string.ankiquest_nudges_unavailable)
+                return@launch
+            }
+            preference.isChecked = current
+            preference.isEnabled = true
+        }
+        preference.setOnPreferenceChangeListener { _, value ->
+            val wanted = value == true
+            if (wanted) askForNotifications()
+            preference.isEnabled = false
+            lifecycleScope.launch {
+                val failure = runCatching { Ankiquest.setNudges(wanted) }.exceptionOrNull()
+                preference.isEnabled = true
+                if (failure == null) return@launch
+                preference.isChecked = !wanted
+                AlertDialog
+                    .Builder(requireContext())
+                    .setTitle(preference.title)
+                    .setMessage(getString(R.string.ankiquest_check_failed, failure.message ?: failure.javaClass.simpleName))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
+            true
+        }
     }
 
     private fun bindAction(
@@ -112,38 +151,31 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 .show()
             return
         }
-        val decks = (0 until rows.length()).map { rows.getJSONObject(it) }
-        val checked = decks.map { it.getBoolean("enabled") }.toBooleanArray()
+        val tree = AnkiquestDeckTree((0 until rows.length()).map { rows.getJSONObject(it) })
+        val list = RecyclerView(context)
+        list.layoutManager = LinearLayoutManager(context)
+        val adapter =
+            AnkiquestDeckAdapter(
+                tree,
+                BooleanArray(tree.size) { tree.rows[it].deck.getBoolean("enabled") },
+            ) {}
+        list.adapter = adapter
         val dialog =
             AlertDialog
                 .Builder(context)
                 .setTitle(R.string.ankiquest_deck_notifications_title)
-                .setMultiChoiceItems(
-                    decks.map { it.getString("name") }.toTypedArray(),
-                    checked,
-                ) { shown, index, value ->
-                    checked[index] = value
-                    for (id in Ankiquest.subdeckIds(decks, decks[index].getString("name"))) {
-                        val child = decks.indexOfFirst { it.getString("id") == id }
-                        if (child < 0) continue
-                        checked[child] = value
-                        (shown as AlertDialog).listView.setItemChecked(child, value)
-                    }
-                }.setPositiveButton(R.string.ankiquest_deck_notifications_next, null)
+                .setView(list)
+                .setPositiveButton(R.string.ankiquest_deck_notifications_next, null)
                 .setNeutralButton(R.string.ankiquest_deck_notifications_select_all, null)
                 .setNegativeButton(android.R.string.cancel, null)
                 .create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
-                val select = checked.any { !it }
-                for (index in checked.indices) {
-                    checked[index] = select
-                    dialog.listView.setItemChecked(index, select)
-                }
+                adapter.setAll(adapter.anyUnchecked())
             }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val shared = decks.filterIndexed { index, _ -> checked[index] }
-                val unshared = decks.filterIndexed { index, _ -> !checked[index] }
+                val shared = tree.rows.filterIndexed { index, _ -> adapter.checked[index] }.map { it.deck }
+                val unshared = tree.rows.filterIndexed { index, _ -> !adapter.checked[index] }.map { it.deck }
                 dialog.dismiss()
                 chooseRecipients(settings, shared, unshared)
             }

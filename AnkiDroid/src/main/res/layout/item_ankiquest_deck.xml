@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:orientation="horizontal">
+
+    <ImageButton
+        android:id="@+id/ankiquest_deck_expand"
+        style="?android:attr/borderlessButtonStyle"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:contentDescription="@string/ankiquest_deck_collapse"
+        android:src="@drawable/ic_expand_less_black_24dp"
+        app:tint="?attr/colorControlNormal" />
+
+    <CheckBox
+        android:id="@+id/ankiquest_deck_check"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp" />
+
+    <ImageButton
+        android:id="@+id/ankiquest_deck_subdecks"
+        style="?android:attr/borderlessButtonStyle"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:contentDescription="@string/ankiquest_deck_apply_subdecks"
+        android:src="@drawable/ic_double_arrow_down"
+        app:tint="?attr/colorControlNormal" />
+</LinearLayout>
