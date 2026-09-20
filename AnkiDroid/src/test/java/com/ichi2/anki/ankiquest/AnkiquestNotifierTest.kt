@@ -2,6 +2,7 @@
 
 package com.ichi2.anki.ankiquest
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.RemoteInput
@@ -117,6 +118,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
     }
 
     @Test
+    @SuppressLint("NewApi") // channels require O, guaranteed by @Config
     fun `a nudge buzzes on its own channel while the rest stay quiet`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         AnkiquestNotifier.onDeckCompletions(
