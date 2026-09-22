@@ -2578,7 +2578,9 @@ open class DeckPicker :
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         this.intent = intent
-        if (intent.hasExtra(AnkiquestHomeActivity.EXTRA_STUDY_DECK)) {
+        if (intent.hasExtra(AnkiquestHomeActivity.EXTRA_STUDY_DECK) &&
+            ankiquestNavigationMode == AnkiquestNavigation.enabled()
+        ) {
             launchCatchingTask { handleAnkiquestEntry() }
         }
         if (intent.hasExtra(INTENT_SYNC_FROM_LOGIN)) {

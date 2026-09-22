@@ -104,7 +104,7 @@ class AnkiquestHomeDataTest : RobolectricTest() {
                     .single()
                     .challengeId,
             )
-            assertEquals(1, result.inbox.value!!.unreadCount)
+        assertEquals(1, result.inbox.value.unreadCount)
         }
 
     @Test
