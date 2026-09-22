@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
 import com.ichi2.anki.awaitDeckHolder
+import com.ichi2.anki.awaitInitialDeckHolder
 import com.ichi2.anki.deckpicker.DeckFilters
 import com.ichi2.anki.deckpicker.filterAndFlattenDisplay
 import com.ichi2.anki.widgets.DeckAdapter
@@ -65,7 +66,7 @@ class DeckAdapterTest : RobolectricTest() {
 
         withDeckPicker(deckCount = 0) { deckPicker ->
             val adapter = (deckPicker.deckPickerBinding.decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
-            val pressedRow = deckPicker.awaitDeckHolder(pressedDeck).itemView
+            val pressedRow = deckPicker.awaitInitialDeckHolder(pressedDeck).itemView
             pressedRow.isPressed = true
             val originalRipple = pressedRow.background
 
@@ -89,7 +90,7 @@ class DeckAdapterTest : RobolectricTest() {
 
         withDeckPicker(deckCount = 0) { deckPicker ->
             val adapter = (deckPicker.deckPickerBinding.decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
-            val parent = deckPicker.awaitDeckHolder(parentDeck)
+            val parent = deckPicker.awaitInitialDeckHolder(parentDeck)
             val changePayloads = mutableListOf<Any?>()
             adapter.observeItemRangeChanges { _, _, payload -> changePayloads.add(payload) }
 
