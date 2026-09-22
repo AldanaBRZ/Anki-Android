@@ -16,11 +16,23 @@ jobs:
     - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         script: |
+          const milestone = 77;
+          try {
+            await github.rest.issues.getMilestone({
+              ...context.repo,
+              milestone_number: milestone
+            });
+          } catch (error) {
+            if (error.status !== 404) throw error;
+            core.info(`Milestone ${milestone} does not exist in ${context.repo.owner}/${context.repo.repo}; skipping assignment.`);
+            return;
+          }
+
           await github.rest.issues.update({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: ${{ github.event.pull_request.number }},
-            milestone: 77
+            issue_number: context.payload.pull_request.number,
+            milestone
           });
 
           // graphql query to get referenced issues to merged pull request
@@ -30,6 +42,9 @@ jobs:
                 closingIssuesReferences(first:10) {
                   nodes {
                     number
+                    repository {
+                      nameWithOwner
+                    }
                   }
                 }              
               }
@@ -37,13 +52,15 @@ jobs:
           }`;
 
           const variables = {
-            _url: "https://github.com/ankidroid/${{ github.event.repository.name }}/pull/${{ github.event.pull_request.number }}"
+            _url: context.payload.pull_request.html_url
           };
 
           const result = await github.graphql(query, variables);
           const refIssues = result.resource.closingIssuesReferences.nodes;
 
-          for (issue of refIssues) {
+          const repository = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+          for (const issue of refIssues) {
+            if (issue.repository.nameWithOwner.toLowerCase() !== repository) continue;
             console.log("Adding milestone to linked issue: ", issue.number);
 
             // if issues have milestone, then it will be removed and updated with following
@@ -51,7 +68,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              milestone: 77
+              milestone
             });
           }
-
