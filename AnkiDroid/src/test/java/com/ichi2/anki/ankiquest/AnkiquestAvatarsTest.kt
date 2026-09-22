@@ -226,99 +226,110 @@ class AnkiquestAvatarsTest : RobolectricTest() {
     }
 
     @Test
-    fun `stale save and remove reject server player or token changes before HTTP`() = runBlocking {
-        val captured = assertNotNull(AnkiquestAvatars.account())
-        for ((key, value) in listOf(Ankiquest.URL_KEY to "$url/other-server", Ankiquest.USER_KEY to "other-player", Ankiquest.TOKEN_KEY to "other-token")) {
-            AnkiDroidApp.sharedPrefs().edit { putString(key, value) }
-            assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.save(captured, createBitmap(64, 64)) }
-            assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(captured) }
-            AnkiDroidApp.sharedPrefs().edit {
-                putString(Ankiquest.URL_KEY, url)
-                putString(Ankiquest.USER_KEY, "cerro")
-                putString(Ankiquest.TOKEN_KEY, "test-token")
+    fun `stale save and remove reject server player or token changes before HTTP`() =
+        runBlocking {
+            val captured = assertNotNull(AnkiquestAvatars.account())
+            for ((key, value) in listOf(
+                Ankiquest.URL_KEY to "$url/other-server",
+                Ankiquest.USER_KEY to "other-player",
+                Ankiquest.TOKEN_KEY to "other-token",
+            )) {
+                AnkiDroidApp.sharedPrefs().edit { putString(key, value) }
+                assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.save(captured, createBitmap(64, 64)) }
+                assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(captured) }
+                AnkiDroidApp.sharedPrefs().edit {
+                    putString(Ankiquest.URL_KEY, url)
+                    putString(Ankiquest.USER_KEY, "cerro")
+                    putString(Ankiquest.TOKEN_KEY, "test-token")
+                }
+            }
+            assertTrue(requests.isEmpty())
+        }
+
+    @Test
+    fun `changed credential hides cached pictures and rejected read removes the old cache`() =
+        runBlocking {
+            AnkiquestAvatars.refresh(listOf("cerro"))
+            assertNotNull(AnkiquestAvatars.bitmap("cerro"))
+            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "invalid-token") }
+            assertNull(AnkiquestAvatars.bitmap("cerro"))
+            protectedManifest = true
+            assertFailsWith<Ankiquest.HttpStatusException> { AnkiquestAvatars.refresh(listOf("cerro")) }
+            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "test-token") }
+            assertNull(AnkiquestAvatars.bitmap("cerro"))
+        }
+
+    @Test
+    fun `a mutation queued behind refresh rechecks account after taking the mutex`() =
+        runBlocking {
+            val captured = assertNotNull(AnkiquestAvatars.account())
+            val started = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            pauseManifest = started to release
+            val refresh = async(Dispatchers.IO) { runCatching { AnkiquestAvatars.refresh(listOf("cerro"), captured) } }
+            try {
+                assertTrue(started.await(10, TimeUnit.SECONDS))
+                val remove = async(Dispatchers.IO) { runCatching { AnkiquestAvatars.remove(captured) } }
+                AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "other-token") }
+                release.countDown()
+                assertTrue(refresh.await().exceptionOrNull() is AnkiquestAvatars.AccountChanged)
+                assertTrue(remove.await().exceptionOrNull() is AnkiquestAvatars.AccountChanged)
+                assertEquals(listOf("GET /api/avatars"), requests.toList())
+            } finally {
+                release.countDown()
             }
         }
-        assertTrue(requests.isEmpty())
-    }
 
     @Test
-    fun `changed credential hides cached pictures and rejected read removes the old cache`() = runBlocking {
-        AnkiquestAvatars.refresh(listOf("cerro"))
-        assertNotNull(AnkiquestAvatars.bitmap("cerro"))
-        AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "invalid-token") }
-        assertNull(AnkiquestAvatars.bitmap("cerro"))
-        protectedManifest = true
-        assertFailsWith<Ankiquest.HttpStatusException> { AnkiquestAvatars.refresh(listOf("cerro")) }
-        AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "test-token") }
-        assertNull(AnkiquestAvatars.bitmap("cerro"))
-    }
-
-    @Test
-    fun `a mutation queued behind refresh rechecks account after taking the mutex`() = runBlocking {
-        val captured = assertNotNull(AnkiquestAvatars.account())
-        val started = CountDownLatch(1)
-        val release = CountDownLatch(1)
-        pauseManifest = started to release
-        val refresh = async(Dispatchers.IO) { runCatching { AnkiquestAvatars.refresh(listOf("cerro"), captured) } }
-        try {
-            assertTrue(started.await(10, TimeUnit.SECONDS))
-            val remove = async(Dispatchers.IO) { runCatching { AnkiquestAvatars.remove(captured) } }
-            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "other-token") }
-            release.countDown()
-            assertTrue(refresh.await().exceptionOrNull() is AnkiquestAvatars.AccountChanged)
-            assertTrue(remove.await().exceptionOrNull() is AnkiquestAvatars.AccountChanged)
-            assertEquals(listOf("GET /api/avatars"), requests.toList())
-        } finally {
-            release.countDown()
+    fun `already dispatched upload stays with original credentials but cannot populate switched account cache`() =
+        runBlocking {
+            val captured = assertNotNull(AnkiquestAvatars.account())
+            changeTokenAfterMutation = true
+            assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.save(captured, createBitmap(64, 64)) }
+            assertEquals(listOf("POST /api/avatar/cerro"), requests.toList())
+            assertEquals(listOf("Bearer test-token"), authorizations.toList())
+            assertTrue(posted.isNotEmpty(), "An already accepted HTTP request cannot be undone by a later settings edit")
+            assertNull(AnkiquestAvatars.bitmap("cerro"))
         }
-    }
 
     @Test
-    fun `already dispatched upload stays with original credentials but cannot populate switched account cache`() = runBlocking {
-        val captured = assertNotNull(AnkiquestAvatars.account())
-        changeTokenAfterMutation = true
-        assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.save(captured, createBitmap(64, 64)) }
-        assertEquals(listOf("POST /api/avatar/cerro"), requests.toList())
-        assertEquals(listOf("Bearer test-token"), authorizations.toList())
-        assertTrue(posted.isNotEmpty(), "An already accepted HTTP request cannot be undone by a later settings edit")
-        assertNull(AnkiquestAvatars.bitmap("cerro"))
-    }
+    fun `stale queued action preserves the current account valid photo cache`() =
+        runBlocking {
+            val previous = assertNotNull(AnkiquestAvatars.account())
+            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "current-member") }
+            AnkiquestAvatars.refresh(listOf("cerro"))
+            val currentPhoto = assertNotNull(AnkiquestAvatars.bitmap("cerro"))
+            val sent = requests.size
+            assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(previous) }
+            assertSame(currentPhoto, AnkiquestAvatars.bitmap("cerro"))
+            assertEquals(sent, requests.size)
+        }
 
     @Test
-    fun `stale queued action preserves the current account valid photo cache`() = runBlocking {
-        val previous = assertNotNull(AnkiquestAvatars.account())
-        AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "current-member") }
-        AnkiquestAvatars.refresh(listOf("cerro"))
-        val currentPhoto = assertNotNull(AnkiquestAvatars.bitmap("cerro"))
-        val sent = requests.size
-        assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(previous) }
-        assertSame(currentPhoto, AnkiquestAvatars.bitmap("cerro"))
-        assertEquals(sent, requests.size)
-    }
+    fun `stale action clears photos when the configured account was removed`() =
+        runBlocking {
+            val previous = assertNotNull(AnkiquestAvatars.account())
+            AnkiquestAvatars.refresh(listOf("cerro"))
+            assertNotNull(AnkiquestAvatars.bitmap("cerro"))
+            AnkiDroidApp.sharedPrefs().edit { remove(Ankiquest.URL_KEY) }
+            assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(previous) }
+            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.URL_KEY, url) }
+            assertNull(AnkiquestAvatars.bitmap("cerro"))
+        }
 
     @Test
-    fun `stale action clears photos when the configured account was removed`() = runBlocking {
-        val previous = assertNotNull(AnkiquestAvatars.account())
-        AnkiquestAvatars.refresh(listOf("cerro"))
-        assertNotNull(AnkiquestAvatars.bitmap("cerro"))
-        AnkiDroidApp.sharedPrefs().edit { remove(Ankiquest.URL_KEY) }
-        assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(previous) }
-        AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.URL_KEY, url) }
-        assertNull(AnkiquestAvatars.bitmap("cerro"))
-    }
-
-    @Test
-    fun `already dispatched removal cannot republish private cache after credential change`() = runBlocking {
-        val captured = assertNotNull(AnkiquestAvatars.account())
-        AnkiquestAvatars.save(captured, createBitmap(64, 64))
-        requests.clear()
-        authorizations.clear()
-        changeTokenAfterMutation = true
-        assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(captured) }
-        assertEquals(listOf("DELETE /api/avatar/cerro"), requests.toList())
-        assertEquals(listOf("Bearer test-token"), authorizations.toList())
-        assertNull(AnkiquestAvatars.bitmap("cerro"))
-    }
+    fun `already dispatched removal cannot republish private cache after credential change`() =
+        runBlocking {
+            val captured = assertNotNull(AnkiquestAvatars.account())
+            AnkiquestAvatars.save(captured, createBitmap(64, 64))
+            requests.clear()
+            authorizations.clear()
+            changeTokenAfterMutation = true
+            assertFailsWith<AnkiquestAvatars.AccountChanged> { AnkiquestAvatars.remove(captured) }
+            assertEquals(listOf("DELETE /api/avatar/cerro"), requests.toList())
+            assertEquals(listOf("Bearer test-token"), authorizations.toList())
+            assertNull(AnkiquestAvatars.bitmap("cerro"))
+        }
 
     @Test
     fun `public server without a token receives no authorization header`() =

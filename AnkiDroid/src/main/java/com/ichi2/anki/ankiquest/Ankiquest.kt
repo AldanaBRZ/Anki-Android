@@ -55,6 +55,7 @@ import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
 import java.lang.ref.WeakReference
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.UnknownHostException
 import java.util.TimeZone
@@ -214,15 +215,16 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     }
 
     /** Whether the server sends this player nudges, without touching deck progress. */
-    suspend fun nudgesEnabled(): Boolean =
-        withContext(Dispatchers.IO) {
-            val (url, user, token) = authenticatedEndpoint()
-            fetchDeckNotificationSettings(url, user, token).optBoolean("nudges")
+    suspend fun nudgesEnabled(): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            fetchDeckNotificationSettings(url, user, token).getBoolean("nudges")
         }
+    }
 
-    suspend fun setNudges(enabled: Boolean) =
-        withContext(Dispatchers.IO) {
-            val (url, user, token) = authenticatedEndpoint()
+    suspend fun setNudges(enabled: Boolean): JSONObject {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
             execute(
                 Request
                     .Builder()
@@ -237,6 +239,35 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                     ).build(),
             )
         }
+    }
+
+    /** Streak protection is stored on the server; never infer it from a local default. */
+    suspend fun streakProtectionEnabled(): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/streak-freezes/$user")
+                    .header("Authorization", "Bearer $token")
+                    .build(),
+            ).getBoolean("enabled")
+        }
+    }
+
+    suspend fun setStreakProtection(enabled: Boolean): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/streak-freezes/$user")
+                    .header("Authorization", "Bearer $token")
+                    .post(JSONObject().put("enabled", enabled).toString().toRequestBody(json))
+                    .build(),
+            ).getBoolean("enabled")
+        }
+    }
 
     /** The ids of every deck nested below the deck called [name] in the settings deck list. */
     fun subdeckIds(
@@ -312,7 +343,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     private fun authenticatedEndpoint(): Triple<String, String, String> {
         val (url, user, token) = endpoint() ?: throw IllegalStateException("Set the server URL and player first.")
 
-        check(token.isNotEmpty()) { "Set your ankiquest token to manage deck notifications." }
+        check(token.isNotEmpty()) { "Set your ankiquest token to manage settings." }
         return Triple(url, user, token)
     }
 
@@ -766,6 +797,15 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     }
 
     fun dashboardUrl(): String? = endpoint()?.let { (url, user) -> "$url/#$user" }
+
+    internal fun webSession(): AnkiquestWebSession? =
+        endpoint()?.let { (url, user, token) ->
+            AnkiquestWebSession(
+                "$url/#$user",
+                URLDecoder.decode(user, "UTF-8"),
+                token,
+            )
+        }
 
     override fun onActivityResumed(activity: Activity) {
         this.activity = WeakReference(activity)
