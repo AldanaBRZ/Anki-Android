@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Cookie
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -63,7 +64,7 @@ import java.util.concurrent.TimeUnit
  * Shows XP, combo, quest and level feedback from an ankiquest server after each answer.
  *
  * With a token, new review log rows are uploaded to the server. Without one, they are only
- * sent to its preview endpoint, which stores nothing.
+ * sent to its preview endpoint, which stores nothing, when the server permits public access.
  */
 object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallbacks {
     const val URL_KEY = "ankiquestUrl"
@@ -90,6 +91,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             .callTimeout(20, TimeUnit.SECONDS)
             .build()
     private val json = "application/json".toMediaType()
+    private val sessionClient =
+        client
+            .newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
 
     private var app: Application? = null
     private var activity = WeakReference<Activity>(null)
@@ -119,8 +126,8 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     /** The player's profile, as served by `/api/profile/<user>`. */
     suspend fun profile(): JSONObject =
         withContext(Dispatchers.IO) {
-            val (url, user) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
-            get("$url/api/profile/$user")
+            val (url, user, token) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
+            get("$url/api/profile/$user", token)
         }
 
     /** The configured player name, or the sync username when none is set. */
@@ -133,24 +140,21 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             .ifEmpty { Prefs.username.orEmpty() }
             .ifEmpty { null }
 
-    private fun endpoint(): Pair<String, String>? {
-        val url =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(URL_KEY, "")
-                .orEmpty()
-                .trim()
-                .trimEnd('/')
-        val user = player()
-        if (url.isEmpty() || user == null) return null
-        return url to URLEncoder.encode(user, "UTF-8").replace("+", "%20")
+    private fun endpoint(): Triple<String, String, String>? {
+        // Keep credentials tied to one server even when settings change during a queued request.
+        val settings = AnkiDroidApp.sharedPrefs().all
+        val url = (settings[URL_KEY] as? String).orEmpty().trim().trimEnd('/')
+        val user = (settings[USER_KEY] as? String).orEmpty().trim().ifEmpty { Prefs.username.orEmpty() }
+        val token = (settings[TOKEN_KEY] as? String).orEmpty().trim()
+        if (url.isEmpty() || user.isEmpty()) return null
+        return Triple(url, URLEncoder.encode(user, "UTF-8").replace("+", "%20"), token)
     }
 
     /** This week's standings, as served by `/api/leaderboard`. */
     suspend fun leaderboard(): JSONArray =
         withContext(Dispatchers.IO) {
-            val (url, _) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
-            client.newCall(Request.Builder().url("$url/api/leaderboard").build()).execute().use { response ->
+            val (url, _, token) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
+            client.newCall(readRequest("$url/api/leaderboard", token)).execute().use { response ->
                 if (!response.isSuccessful) throw HttpStatusException(response.code)
                 JSONArray(response.body.string())
             }
@@ -291,13 +295,8 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         }
 
     private fun authenticatedEndpoint(): Triple<String, String, String> {
-        val (url, user) = endpoint() ?: throw IllegalStateException("Set the server URL and player first.")
-        val token =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(TOKEN_KEY, "")
-                .orEmpty()
-                .trim()
+        val (url, user, token) = endpoint() ?: throw IllegalStateException("Set the server URL and player first.")
+
         check(token.isNotEmpty()) { "Set your ankiquest token to manage deck notifications." }
         return Triple(url, user, token)
     }
@@ -320,13 +319,8 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         showFeedback: Boolean,
         resync: Boolean = false,
     ) {
-        val (url, user) = endpoint() ?: return
-        val token =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(TOKEN_KEY, "")
-                .orEmpty()
-                .trim()
+        val (url, user, token) = endpoint() ?: return
+
         scope.launch {
             try {
                 mutex.withLock {
@@ -535,7 +529,46 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             rows
         }
 
-    private fun get(url: String): JSONObject = execute(Request.Builder().url(url).build())
+    private fun readRequest(
+        url: String,
+        token: String,
+    ): Request =
+        Request
+            .Builder()
+            .url(url)
+            .apply {
+                token.takeIf { it.isNotEmpty() }?.let { header("Authorization", "Bearer $it") }
+            }.build()
+
+    private fun get(
+        url: String,
+        token: String = "",
+    ): JSONObject = execute(readRequest(url, token))
+
+    /** Exchange the configured token for an HttpOnly browser cookie without exposing it to the page. */
+    internal suspend fun dashboardSession(dashboard: String): String? =
+        withContext(Dispatchers.IO) {
+            val (url, user, token) = endpoint() ?: return@withContext null
+            if (dashboard != "$url/#$user") return@withContext null
+            if (token.isEmpty()) return@withContext null
+            val request =
+                Request
+                    .Builder()
+                    .url("$url/auth/session")
+                    .header("Authorization", "Bearer $token")
+                    .post(ByteArray(0).toRequestBody())
+                    .build()
+            sessionClient.newCall(request).execute().use { response ->
+                // Older public servers do not have the session endpoint.
+                if (response.code == 404) return@withContext null
+                if (!response.isSuccessful) throw HttpStatusException(response.code)
+                response.headers.values("Set-Cookie").firstOrNull { value ->
+                    val cookie = Cookie.parse(request.url, value)
+                    cookie != null && cookie.name == "ankiquest_session" && cookie.hostOnly &&
+                        cookie.path == "/" && cookie.httpOnly && (!request.url.isHttps || cookie.secure)
+                } ?: throw IOException("The ankiquest server did not return a valid session cookie")
+            }
+        }
 
     private fun execute(request: Request): JSONObject =
         client.newCall(request).execute().use { response ->
@@ -561,18 +594,13 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         context: Context,
         uploadAll: Boolean,
     ): String {
-        val (url, user) = endpoint() ?: return context.getString(R.string.ankiquest_check_unconfigured)
-        val token =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(TOKEN_KEY, "")
-                .orEmpty()
-                .trim()
+        val (url, user, token) = endpoint() ?: return context.getString(R.string.ankiquest_check_unconfigured)
+
         return try {
             mutex.withLock {
                 val profile =
                     if (token.isEmpty()) {
-                        get("$url/api/profile/$user")
+                        get("$url/api/profile/$user", token)
                     } else {
                         if (uploadAll) {
                             AnkiDroidApp.sharedPrefs().edit {

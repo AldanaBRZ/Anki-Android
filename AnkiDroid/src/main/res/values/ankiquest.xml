@@ -54,7 +54,7 @@
     <string name="ankiquest_upload_all_summary" translatable="false">Send your whole review history. Already uploaded reviews are skipped by the server.</string>
     <string name="ankiquest_check_running" translatable="false">Contacting the server…</string>
     <string name="ankiquest_check_ok" translatable="false">Connected as %1$s: level %2$d, %3$d XP, %4$d reviews on the server.</string>
-    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored.</string>
+    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored. Private servers require your member token.</string>
     <string name="ankiquest_check_unconfigured" translatable="false">Set the server URL and player first.</string>
     <string name="ankiquest_check_unauthorized" translatable="false">The server rejected the player or token. Check both for typos.</string>
     <string name="ankiquest_check_unknown_player" translatable="false">The server does not know this player yet. Set the token so your reviews can be uploaded.</string>
