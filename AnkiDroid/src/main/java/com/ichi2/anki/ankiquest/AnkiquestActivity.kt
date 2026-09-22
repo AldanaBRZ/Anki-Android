@@ -15,24 +15,69 @@
 package com.ichi2.anki.ankiquest
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat.Type.displayCutout
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import androidx.core.view.updatePadding
+import androidx.lifecycle.lifecycleScope
 import com.ichi2.anki.AnkiActivity
 import com.ichi2.anki.R
 import com.ichi2.anki.preferences.AnkiquestSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import timber.log.Timber
+import kotlin.coroutines.resume
+
+/** CookieManager is process-wide: no superseded screen may clear or install after its successor. */
+internal class AnkiquestBrowserSessionBridge {
+    private val mutex = Mutex()
+
+    suspend fun prepare(
+        current: () -> Boolean,
+        clear: suspend () -> Boolean,
+        bootstrap: suspend () -> String?,
+        install: suspend (String) -> Boolean,
+    ): Boolean =
+        mutex.withLock {
+            if (!current()) return@withLock false
+            // A CookieManager mutation cannot be cancelled once enqueued. Wait for its
+            // acknowledgement before releasing the lock, even when the screen closes.
+            if (!withContext(NonCancellable) { clear() }) return@withLock false
+            currentCoroutineContext().ensureActive()
+            if (!current()) return@withLock false
+            val cookie = bootstrap()
+            currentCoroutineContext().ensureActive()
+            if (!current()) return@withLock false
+            if (cookie != null && !withContext(NonCancellable) { install(cookie) }) return@withLock false
+            currentCoroutineContext().ensureActive()
+            current()
+        }
+}
 
 /** Shows the ankiquest dashboard: profile, quests, achievements and the leaderboard. */
 class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
@@ -42,6 +87,13 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
     private var clearHistoryAfterLoad = false
     private var pendingDashboard: String? = null
     private var browserBack: OnBackPressedCallback? = null
+    private var prepareSession: Job? = null
+    private var fileResult: ValueCallback<Array<Uri>>? = null
+    private val choosePicture =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            fileResult?.onReceiveValue(uri?.let { arrayOf(it) })
+            fileResult = null
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +118,24 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         webView.settings.domStorageEnabled = true
         webView.webChromeClient =
             object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    view: WebView,
+                    callback: ValueCallback<Array<Uri>>,
+                    params: FileChooserParams,
+                ): Boolean {
+                    val current = session?.takeIf { it == Ankiquest.webSession() } ?: return false
+                    if (!acceptsPictureOrigin(view.url?.toUri(), current.dashboard.toUri())) return false
+                    fileResult?.onReceiveValue(null)
+                    fileResult = callback
+                    return try {
+                        choosePicture.launch("image/*")
+                        true
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        fileResult = null
+                        false
+                    }
+                }
+
                 override fun onProgressChanged(
                     view: WebView,
                     newProgress: Int,
@@ -102,7 +172,7 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
                         if (url == "about:blank" && view.url == url) {
                             val destination = checkNotNull(pendingDashboard)
                             pendingDashboard = null
-                            view.loadUrl(destination)
+                            loadSession(destination)
                         }
                         return
                     }
@@ -126,12 +196,58 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
                     back.isEnabled = pendingDashboard == null && !clearHistoryAfterLoad && view.canGoBack()
                 }
             }
-        if (savedInstanceState == null || savedInstanceState.getString(DASHBOARD_STATE) != session?.dashboard) {
-            webView.loadUrl(dashboard)
-        } else {
-            if (webView.restoreState(savedInstanceState) == null) webView.loadUrl(dashboard)
-        }
+        loadSession(dashboard, savedInstanceState)
     }
+
+    /** Re-authenticate before loading either the dashboard or a settings shortcut. */
+    private fun loadSession(
+        destination: String,
+        savedInstanceState: Bundle? = null,
+    ) {
+        val expected = session ?: return
+        prepareSession?.cancel()
+        prepareSession =
+            lifecycleScope.launch {
+                val ready =
+                    sessionBridge.prepare(
+                        current = { expected == session && expected == Ankiquest.webSession() },
+                        clear = { setSessionCookie(expected.dashboard, "ankiquest_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax") },
+                        bootstrap = {
+                            try {
+                                Ankiquest.dashboardSession(expected.dashboard)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                // A public server or the website's sign-in screen can still be opened.
+                                Timber.w(e, "ankiquest browser session failed")
+                                null
+                            }
+                        },
+                        install = { cookie -> setSessionCookie(expected.dashboard, cookie) },
+                    )
+                if (expected != session || expected != Ankiquest.webSession()) return@launch
+                if (!ready) {
+                    findViewById<ProgressBar>(R.id.progress_bar).visibility = View.GONE
+                    webView.loadData("<p>Unable to prepare your connection. Close this screen and try again.</p>", "text/html", "UTF-8")
+                    return@launch
+                }
+                if (savedInstanceState == null || savedInstanceState.getString(DASHBOARD_STATE) != expected.dashboard ||
+                    savedInstanceState.getString(DESTINATION_STATE) != destination || webView.restoreState(savedInstanceState) == null
+                ) {
+                    webView.loadUrl(destination)
+                }
+            }
+    }
+
+    private suspend fun setSessionCookie(
+        url: String,
+        cookie: String,
+    ): Boolean =
+        suspendCancellableCoroutine { continuation ->
+            CookieManager.getInstance().setCookie(url, cookie) { accepted ->
+                if (continuation.isActive) continuation.resume(accepted)
+            }
+        }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.ankiquest, menu)
@@ -150,6 +266,7 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         if (!::webView.isInitialized) return
         val current = Ankiquest.webSession()
         if (current == null) {
+            prepareSession?.cancel()
             session = null
             pendingDashboard = null
             webView.loadUrl("about:blank")
@@ -157,6 +274,9 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
             return
         }
         if (current != session) {
+            prepareSession?.cancel()
+            fileResult?.onReceiveValue(null)
+            fileResult = null
             session = current
             clearHistoryAfterLoad = true
             browserBack?.isEnabled = false
@@ -171,9 +291,16 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
 
     private fun initialUrl(): String? = if (intent.getBooleanExtra(COMMUNITY_REMINDERS, false)) session?.community else session?.dashboard
 
+    override fun onDestroy() {
+        fileResult?.onReceiveValue(null)
+        fileResult = null
+        super.onDestroy()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(DASHBOARD_STATE, session?.dashboard)
+        outState.putString(DESTINATION_STATE, initialUrl())
         if (::webView.isInitialized && pendingDashboard == null && !clearHistoryAfterLoad) webView.saveState(outState)
     }
 
@@ -190,5 +317,16 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
     companion object {
         const val COMMUNITY_REMINDERS = "ankiquestCommunityReminders"
         private const val DASHBOARD_STATE = "ankiquestDashboard"
+        private const val DESTINATION_STATE = "ankiquestDestination"
+        private val sessionBridge = AnkiquestBrowserSessionBridge()
+
+        internal fun acceptsPictureOrigin(
+            current: Uri?,
+            base: Uri,
+        ): Boolean {
+            val expected = base.toString().toHttpUrlOrNull() ?: return false
+            val actual = current?.toString()?.toHttpUrlOrNull() ?: return false
+            return actual.scheme == expected.scheme && actual.host == expected.host && actual.port == expected.port
+        }
     }
 }

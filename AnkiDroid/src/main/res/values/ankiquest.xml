@@ -8,6 +8,12 @@
     <string name="ankiquest_streak_protection_key" translatable="false">ankiquestStreakProtection</string>
     <string name="ankiquest_streak_protection_title" translatable="false" maxLength="41">Streak protection</string>
     <string name="ankiquest_streak_protection_summary" translatable="false">Off by default. After opting in, finish all three daily quests to earn one freeze per Anki day, up to 3. One is used automatically for each ended day without reviews. Turning this off pauses earning and use; saved freezes stay.</string>
+    <string name="ankiquest_avatar_key" translatable="false">ankiquestAvatar</string>
+    <string name="ankiquest_avatar_title" translatable="false" maxLength="41">Profile picture</string>
+    <string name="ankiquest_avatar_summary" translatable="false">Choose a picture for your profile, leaderboard and widgets</string>
+    <string name="ankiquest_avatar_choose" translatable="false">Choose picture</string>
+    <string name="ankiquest_avatar_remove" translatable="false">Remove picture</string>
+    <string name="ankiquest_avatar_remove_confirm" translatable="false">Remove your profile picture and use your initial again?</string>
     <string name="ankiquest_deck_notifications_key" translatable="false">ankiquestDeckNotifications</string>
     <string name="ankiquest_deck_notifications_title" translatable="false" maxLength="41">Deck completion notifications</string>
     <string name="ankiquest_deck_notifications_summary" translatable="false">Choose who hears when you finish a deck for the day</string>
@@ -33,7 +39,6 @@
     <string name="ankiquest_reply_sent" translatable="false">Sent to %1$s: %2$s</string>
     <string name="ankiquest_reply_failed" translatable="false">Could not send \u201c%1$s\u201d. Tap a button to try again.</string>
     <string-array name="ankiquest_reply_choices" translatable="false">
-        <item>Good job!</item>
         <item>Nice one \ud83d\udd25</item>
         <item>Keep it up!</item>
     </string-array>
@@ -62,7 +67,7 @@
     <string name="ankiquest_upload_all_summary" translatable="false">Send your whole review history. Already uploaded reviews are skipped by the server.</string>
     <string name="ankiquest_check_running" translatable="false">Contacting the server…</string>
     <string name="ankiquest_check_ok" translatable="false">Connected as %1$s: level %2$d, %3$d XP, %4$d reviews on the server.</string>
-    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored.</string>
+    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored. Private servers require your member token.</string>
     <string name="ankiquest_check_unconfigured" translatable="false">Set the server URL and player first.</string>
     <string name="ankiquest_check_unauthorized" translatable="false">The server rejected the player or token. Check both for typos.</string>
     <string name="ankiquest_check_unknown_player" translatable="false">The server does not know this player yet. Set the token so your reviews can be uploaded.</string>

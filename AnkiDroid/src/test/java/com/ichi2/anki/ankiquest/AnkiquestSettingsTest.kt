@@ -2,14 +2,24 @@
 
 package com.ichi2.anki.ankiquest
 
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.SharedPreferences
+import android.os.Looper
 import android.webkit.WebView
 import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import org.json.JSONObject
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,10 +37,45 @@ import kotlin.test.assertTrue
 class AnkiquestSettingsTest : RobolectricTest() {
     @Before
     fun configureAccount() {
+        mockkObject(Ankiquest)
+        coEvery { Ankiquest.dashboardSession(any()) } returns null
         AnkiDroidApp.sharedPrefs().edit {
             putString(Ankiquest.URL_KEY, "https://quest.example/anki")
             putString(Ankiquest.USER_KEY, "cerro")
             putString(Ankiquest.TOKEN_KEY, "saved-test-token")
+        }
+    }
+
+    @After
+    fun clearMocks() {
+        unmockkObject(Ankiquest)
+    }
+
+    @Test
+    fun `web credentials come from one account snapshot when settings change during capture`() {
+        val preferences = AnkiDroidApp.sharedPrefs()
+        val previousOverride = AnkiDroidApp.sharedPreferencesTestingOverride
+        val changingPreferences = mockk<SharedPreferences>()
+        every { changingPreferences.getString(any(), any()) } answers { preferences.getString(firstArg(), secondArg()) }
+        every { changingPreferences.all } answers {
+            val captured = preferences.all
+            preferences.edit {
+                putString(Ankiquest.URL_KEY, "https://different.example")
+                putString(Ankiquest.USER_KEY, "hill")
+                putString(Ankiquest.TOKEN_KEY, "different-server-secret")
+            }
+            captured
+        }
+        AnkiDroidApp.sharedPreferencesTestingOverride = changingPreferences
+        try {
+            val session = assertNotNull(Ankiquest.webSession())
+            assertEquals("https://quest.example/anki/#cerro", session.dashboard)
+            assertEquals("cerro", session.user)
+            val script = assertNotNull(session.script(session.dashboard))
+            assertTrue(script.contains("saved-test-token"))
+            assertFalse(script.contains("different-server-secret"))
+        } finally {
+            AnkiDroidApp.sharedPreferencesTestingOverride = previousOverride
         }
     }
 
@@ -49,7 +94,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
 
     @Test
     fun `leaderboard offers the full native settings page`() {
-        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create()
+        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create().also { shadowOf(Looper.getMainLooper()).idle() }
         saveControllerForCleanup(controller)
         val menu = RoboMenu()
         controller.get().onCreateOptionsMenu(menu)
@@ -58,10 +103,10 @@ class AnkiquestSettingsTest : RobolectricTest() {
 
     @Test
     fun `dashboard receives the saved account without asking for its token again`() {
-        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create()
+        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create().also { shadowOf(Looper.getMainLooper()).idle() }
         saveControllerForCleanup(controller)
         val webView = controller.get().findViewById<WebView>(R.id.web_view)
-        webView.webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
         val script = assertNotNull(shadowOf(webView).lastEvaluatedJavascript)
         assertTrue(script.contains("saved-test-token"))
         assertTrue(script.contains("ankiquest-auth"))
@@ -69,6 +114,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
     }
 
     @Test
+    @SuppressLint("AuthLeak") // Deliberately rejected example credentials, not a real secret.
     fun `credentials are limited to the configured origin and known AnkiQuest pages`() {
         val session = AnkiquestWebSession("https://quest.example:443/anki/#cerro", "cerro", "secret")
         for (route in listOf("", "hour", "day", "week", "month", "year", "all", "records", "community")) {
@@ -143,21 +189,27 @@ class AnkiquestSettingsTest : RobolectricTest() {
     @Test
     fun `community reminders open with the same saved account`() {
         val intent = Intent(targetContext, AnkiquestActivity::class.java).putExtra(AnkiquestActivity.COMMUNITY_REMINDERS, true)
-        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java, intent).create()
+        val controller =
+            Robolectric
+                .buildActivity(
+                    AnkiquestActivity::class.java,
+                    intent,
+                ).create()
+                .also { shadowOf(Looper.getMainLooper()).idle() }
         saveControllerForCleanup(controller)
         val webView = controller.get().findViewById<WebView>(R.id.web_view)
         assertEquals("https://quest.example/anki/community#reminders", shadowOf(webView).lastLoadedUrl)
-        webView.webViewClient.onPageFinished(webView, shadowOf(webView).lastLoadedUrl)
+        shadowOf(webView).webViewClient.onPageFinished(webView, shadowOf(webView).lastLoadedUrl)
         assertTrue(assertNotNull(shadowOf(webView).lastEvaluatedJavascript).contains("saved-test-token"))
     }
 
     @Test
     fun `dashboard does not inject credentials after a redirect to another document`() {
-        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create()
+        val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create().also { shadowOf(Looper.getMainLooper()).idle() }
         saveControllerForCleanup(controller)
         val webView = controller.get().findViewById<WebView>(R.id.web_view)
         webView.loadUrl("https://quest.example/anki/login")
-        webView.webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
         assertNull(shadowOf(webView).lastEvaluatedJavascript)
     }
 
@@ -167,6 +219,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
             Robolectric
                 .buildActivity(AnkiquestActivity::class.java)
                 .create()
+                .also { shadowOf(Looper.getMainLooper()).idle() }
                 .start()
                 .resume()
         saveControllerForCleanup(controller)
@@ -185,6 +238,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
             Robolectric
                 .buildActivity(AnkiquestActivity::class.java)
                 .create()
+                .also { shadowOf(Looper.getMainLooper()).idle() }
                 .start()
                 .resume()
         saveControllerForCleanup(controller)
@@ -196,19 +250,22 @@ class AnkiquestSettingsTest : RobolectricTest() {
         }
         controller.resume()
         assertEquals("about:blank", shadowOf(webView).lastLoadedUrl)
-        webView.webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
         assertNull(shadowOf(webView).lastEvaluatedJavascript)
-        webView.webViewClient.onPageFinished(webView, "about:blank")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals("https://quest.example/anki/#hill", shadowOf(webView).lastLoadedUrl)
         assertFalse(shadowOf(webView).wasClearHistoryCalled())
-        webView.webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
         assertFalse(shadowOf(webView).wasClearHistoryCalled())
         assertNull(shadowOf(webView).lastEvaluatedJavascript)
-        webView.webViewClient.onPageFinished(webView, "https://quest.example/anki/#hill")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#hill")
         assertTrue(shadowOf(webView).wasClearHistoryCalled())
         val script = assertNotNull(shadowOf(webView).lastEvaluatedJavascript)
         assertTrue(script.contains("new-token"))
         assertFalse(script.contains("saved-test-token"))
+        coVerify(exactly = 1) { Ankiquest.dashboardSession("https://quest.example/anki/#cerro") }
+        coVerify(exactly = 1) { Ankiquest.dashboardSession("https://quest.example/anki/#hill") }
     }
 
     @Test
@@ -217,6 +274,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
             Robolectric
                 .buildActivity(AnkiquestActivity::class.java)
                 .create()
+                .also { shadowOf(Looper.getMainLooper()).idle() }
                 .start()
                 .resume()
         saveControllerForCleanup(controller)
@@ -225,11 +283,35 @@ class AnkiquestSettingsTest : RobolectricTest() {
         AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "replacement-token") }
         controller.resume()
         assertEquals("about:blank", shadowOf(webView).lastLoadedUrl)
-        webView.webViewClient.onPageFinished(webView, "about:blank")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals("https://quest.example/anki/#cerro", shadowOf(webView).lastLoadedUrl)
-        webView.webViewClient.onPageFinished(webView, shadowOf(webView).lastLoadedUrl)
+        shadowOf(webView).webViewClient.onPageFinished(webView, shadowOf(webView).lastLoadedUrl)
         val script = assertNotNull(shadowOf(webView).lastEvaluatedJavascript)
         assertTrue(script.contains("replacement-token"))
         assertFalse(script.contains("saved-test-token"))
+    }
+
+    @Test
+    fun `picture chooser follows the new configured server after returning from settings`() {
+        val controller =
+            Robolectric
+                .buildActivity(AnkiquestActivity::class.java)
+                .create()
+                .also { shadowOf(Looper.getMainLooper()).idle() }
+                .start()
+                .resume()
+        saveControllerForCleanup(controller)
+        val webView = controller.get().findViewById<WebView>(R.id.web_view)
+        controller.pause()
+        AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.URL_KEY, "https://new.example/quest") }
+        controller.resume()
+        shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
+        shadowOf(Looper.getMainLooper()).idle()
+        val chrome = assertNotNull(shadowOf(webView).webChromeClient)
+        assertEquals("https://new.example/quest/#cerro", shadowOf(webView).lastLoadedUrl)
+        assertTrue(chrome.onShowFileChooser(webView, mockk(relaxed = true), mockk()))
+        webView.loadUrl("https://quest.example/anki/#cerro")
+        assertFalse(chrome.onShowFileChooser(webView, mockk(relaxed = true), mockk()))
     }
 }

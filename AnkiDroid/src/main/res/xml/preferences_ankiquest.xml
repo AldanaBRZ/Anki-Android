@@ -22,6 +22,11 @@
         android:key="@string/ankiquest_token_key"
         android:title="@string/ankiquest_token_title"
         android:inputType="textPassword" />
+    <Preference
+        android:key="@string/ankiquest_avatar_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_avatar_title"
+        android:summary="@string/ankiquest_avatar_summary" />
     <SwitchPreferenceCompat
         android:defaultValue="true"
         android:key="@string/ankiquest_notify_rank_key"
