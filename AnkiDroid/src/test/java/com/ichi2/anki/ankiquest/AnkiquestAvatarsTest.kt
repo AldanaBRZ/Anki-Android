@@ -2,6 +2,7 @@
 
 package com.ichi2.anki.ankiquest
 
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.view.Gravity
@@ -23,6 +24,8 @@ import com.ichi2.anki.RobolectricTest
 import com.ichi2.anki.common.preferences.sharedPrefs
 import com.ichi2.testutils.EmptyApplication
 import com.sun.net.httpserver.HttpServer
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -124,6 +127,36 @@ class AnkiquestAvatarsTest : RobolectricTest() {
     fun stopServer() {
         server.stop(0)
         AnkiDroidApp.sharedPreferencesTestingOverride = null
+    }
+
+    @Test
+    fun `account snapshot cannot pair a new token with the previous server`() {
+        val preferences = targetContext.sharedPrefs()
+        val changingPreferences = mockk<SharedPreferences>()
+
+        fun switchServer() {
+            preferences.edit {
+                putString(Ankiquest.URL_KEY, "https://new-private.example.test")
+                putString(Ankiquest.TOKEN_KEY, "new-private-token")
+            }
+        }
+        every { changingPreferences.getString(any(), any()) } answers { preferences.getString(firstArg(), secondArg()) }
+        every { changingPreferences.getString(Ankiquest.URL_KEY, "") } answers {
+            val captured = preferences.getString(Ankiquest.URL_KEY, "")
+            switchServer()
+            captured
+        }
+        every { changingPreferences.all } answers {
+            val captured = preferences.all
+            switchServer()
+            captured
+        }
+        AnkiDroidApp.sharedPreferencesTestingOverride = changingPreferences
+
+        val account = assertNotNull(AnkiquestAvatars.account())
+        assertEquals("$url/", account.base.toString())
+        assertEquals("cerro", account.user)
+        assertEquals("test-token", account.token)
     }
 
     @Test

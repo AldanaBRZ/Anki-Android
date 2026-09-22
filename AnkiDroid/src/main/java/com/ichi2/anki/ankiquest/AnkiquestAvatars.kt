@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.ichi2.anki.AnkiDroidApp
+import com.ichi2.anki.settings.Prefs
 import com.ichi2.utils.openInputStreamSafe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -78,16 +79,13 @@ object AnkiquestAvatars {
     private var cached = Cache("", emptyMap())
 
     fun account(): Account? {
-        val prefs = AnkiDroidApp.sharedPrefs()
-        val url =
-            prefs
-                .getString(Ankiquest.URL_KEY, "")
-                .orEmpty()
-                .trim()
-                .trimEnd('/')
-        val user = Ankiquest.player() ?: return null
-        if (url.isEmpty()) return null
-        return Account("$url/".toHttpUrl(), user, prefs.getString(Ankiquest.TOKEN_KEY, "").orEmpty().trim())
+        // Keep the server and its credentials together if settings change during a refresh.
+        val settings = AnkiDroidApp.sharedPrefs().all
+        val url = (settings[Ankiquest.URL_KEY] as? String).orEmpty().trim().trimEnd('/')
+        val user = (settings[Ankiquest.USER_KEY] as? String).orEmpty().trim().ifEmpty { Prefs.username.orEmpty() }
+        val token = (settings[Ankiquest.TOKEN_KEY] as? String).orEmpty().trim()
+        if (url.isEmpty() || user.isEmpty()) return null
+        return Account("$url/".toHttpUrl(), user, token)
     }
 
     fun bitmap(user: String): Bitmap? {
