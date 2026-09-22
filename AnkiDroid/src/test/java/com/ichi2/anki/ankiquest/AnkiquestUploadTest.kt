@@ -14,6 +14,11 @@ import com.ichi2.anki.common.preferences.sharedPrefs
 import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.testutils.EmptyApplication
 import com.sun.net.httpserver.HttpServer
+import io.mockk.Runs
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
@@ -56,6 +61,10 @@ class AnkiquestUploadTest : RobolectricTest() {
 
     @Before
     fun startServer() {
+        // Polling has its own AnkiquestPollTest coverage and must not outlive this fixture's
+        // HTTP server or WorkManager database when an upload requests a widget refresh.
+        mockkObject(AnkiquestWidget)
+        every { AnkiquestWidget.requestUpdate(any()) } just Runs
         AnkiDroidApp.sharedPreferencesTestingOverride = targetContext.sharedPrefs()
         TimeManager.reset()
         addBasicNote()
@@ -103,8 +112,12 @@ class AnkiquestUploadTest : RobolectricTest() {
 
     @After
     fun stopServer() {
-        if (::server.isInitialized) server.stop(0)
-        AnkiDroidApp.sharedPreferencesTestingOverride = null
+        try {
+            if (::server.isInitialized) server.stop(0)
+        } finally {
+            unmockkObject(AnkiquestWidget)
+            AnkiDroidApp.sharedPreferencesTestingOverride = null
+        }
     }
 
     @Test
