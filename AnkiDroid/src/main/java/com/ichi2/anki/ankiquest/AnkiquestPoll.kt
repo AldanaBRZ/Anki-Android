@@ -72,6 +72,11 @@ object AnkiquestPoll {
     suspend fun run(context: Context): Result {
         val prefs = AnkiDroidApp.sharedPrefs()
         val configured = Ankiquest.dashboardUrl() != null
+        val photoAccount = runCatching { AnkiquestAvatars.account() }.getOrNull()
+        val photoScope = photoAccount?.scope
+        var photoBoard: JSONArray? = null
+        var photoFetchedAt = 0L
+        var photoOffline = false
         try {
             if (!configured) {
                 AnkiquestWidget.render(context, null, 0, offline = false)
@@ -92,10 +97,15 @@ object AnkiquestPoll {
                         putLong(CACHE_AT_KEY, now)
                     }
                     AnkiquestWidget.render(context, board, now, offline = false)
+                    photoBoard = board
+                    photoFetchedAt = now
                     AnkiquestNotifier.onLeaderboard(context, board)
                 } else {
                     val cached = prefs.getString(CACHE_KEY, null)?.let { JSONArray(it) } ?: JSONArray()
                     AnkiquestWidget.render(context, cached, prefs.getLong(CACHE_AT_KEY, 0), offline = true)
+                    photoBoard = cached
+                    photoFetchedAt = prefs.getLong(CACHE_AT_KEY, 0)
+                    photoOffline = true
                 }
             }
         } catch (e: CancellationException) {
@@ -111,20 +121,43 @@ object AnkiquestPoll {
         } catch (e: Exception) {
             Timber.w(e, "ankiquest profile fetch failed")
         }
-        return try {
-            Ankiquest.completionNotifications()?.let { (account, notifications, scope) ->
-                AnkiquestNotifier.onDeckCompletions(context, account, notifications, scope)
+        val result =
+            try {
+                Ankiquest.completionNotifications()?.let { (account, notifications, scope) ->
+                    AnkiquestNotifier.onDeckCompletions(context, account, notifications, scope)
+                }
+                Result.success()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "ankiquest completion inbox fetch failed")
+                val transient =
+                    e is IOException &&
+                        (e !is Ankiquest.HttpStatusException || e.code == 408 || e.code == 429 || e.code in 500..599)
+                if (transient) Result.retry() else Result.success()
             }
-            Result.success()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Timber.w(e, "ankiquest completion inbox fetch failed")
-            val transient =
-                e is IOException &&
-                    (e !is Ankiquest.HttpStatusException || e.code == 408 || e.code == 429 || e.code in 500..599)
-            if (transient) Result.retry() else Result.success()
+        // Optional pictures are fetched after the inbox, so unavailable photos cannot delay messages.
+        photoBoard?.let { board ->
+            val stillCurrent = {
+                photoScope != null &&
+                    photoScope == runCatching { AnkiquestAvatars.account()?.scope }.getOrNull() &&
+                    prefs.getLong(CACHE_AT_KEY, 0) == photoFetchedAt &&
+                    prefs.getString(CACHE_KEY, null) == board.toString()
+            }
+            if (!stillCurrent()) return@let
+            try {
+                AnkiquestAvatars.refresh(
+                    (0 until board.length()).map { board.getJSONObject(it).getString("user") },
+                    photoAccount,
+                )
+                if (stillCurrent()) AnkiquestWidget.render(context, board, photoFetchedAt, photoOffline)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.d(e, "ankiquest optional photos could not refresh")
+            }
         }
+        return result
     }
 }
 

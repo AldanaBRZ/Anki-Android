@@ -97,7 +97,7 @@ object AnkiquestReply {
             NotificationCompat.Action
                 .Builder(R.drawable.ic_star_notify, context.getString(R.string.ankiquest_reply), pending(CUSTOM_ACTION, null, true))
                 .addRemoteInput(reply)
-                .setAllowGeneratedReplies(true)
+                .setAllowGeneratedReplies(false)
                 .build(),
         )
     }

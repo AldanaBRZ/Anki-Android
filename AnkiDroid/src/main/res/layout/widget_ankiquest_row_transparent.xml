@@ -22,6 +22,37 @@
         android:textColor="@color/ankiquest_widget_clear_text_dim"
         android:textSize="16sp" />
 
+    <FrameLayout
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="4dp"
+        android:importantForAccessibility="noHideDescendants">
+
+        <TextView
+            android:id="@+id/ankiquest_widget_initial"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/ankiquest_widget_avatar_background"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:shadowColor="#B3000000"
+            android:shadowDy="1"
+            android:shadowRadius="3"
+            android:textColor="@color/ankiquest_widget_clear_text"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/ankiquest_widget_avatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/ankiquest_widget_avatar_background"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+    </FrameLayout>
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"

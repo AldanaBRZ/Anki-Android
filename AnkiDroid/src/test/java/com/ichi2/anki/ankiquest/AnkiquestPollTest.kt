@@ -48,6 +48,15 @@ class AnkiquestPollTest : RobolectricTest() {
     private var leaderboardStatus = 200
 
     @Volatile
+    private var avatarStatus = 200
+
+    @Volatile
+    private var switchAccountDuringAvatars = false
+
+    @Volatile
+    private var replaceBoardDuringAvatars = false
+
+    @Volatile
     private var inboxBody = "[]"
 
     @Volatile
@@ -66,6 +75,15 @@ class AnkiquestPollTest : RobolectricTest() {
         server.createContext("/") { exchange ->
             val path = exchange.requestURI.path
             requests.add(path)
+            if (path == "/api/avatars" && switchAccountDuringAvatars) {
+                AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "other") }
+            }
+            if (path == "/api/avatars" && replaceBoardDuringAvatars) {
+                AnkiDroidApp.sharedPrefs().edit {
+                    putLong("ankiquestWidgetLeaderboardAt", AnkiDroidApp.sharedPrefs().getLong("ankiquestWidgetLeaderboardAt", 0) + 1)
+                    putString("ankiquestWidgetLeaderboard", "[{\"user\":\"newer\"}]")
+                }
+            }
             val inbox = path.startsWith("/api/notifications/")
             if (inbox && switchAccountDuringInbox) {
                 AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "other") }
@@ -74,6 +92,7 @@ class AnkiquestPollTest : RobolectricTest() {
                 when {
                     inbox -> inboxStatus
                     path == "/api/leaderboard" -> leaderboardStatus
+                    path == "/api/avatars" -> avatarStatus
                     else -> 200
                 }
             val response =
@@ -203,13 +222,15 @@ class AnkiquestPollTest : RobolectricTest() {
     @Test
     fun `inbox response retains its captured account when settings change`() =
         runBlocking {
+            val expectedScope = requireNotNull(AnkiquestHomeData.account()).scope
             switchAccountDuringInbox = true
 
             assertEquals(Result.success(), worker().doWork())
 
             assertEquals("other", Ankiquest.player())
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), expectedScope) }
             verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), "$url/other", any(), any()) }
+            assertTrue(requests.none { it == "/api/avatars" })
         }
 
     @Test
@@ -228,6 +249,40 @@ class AnkiquestPollTest : RobolectricTest() {
             every { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) } throws CancellationException("Worker stopped")
 
             assertFailsWith<CancellationException> { worker().doWork() }
+        }
+
+    @Test
+    fun `photo failure happens after inbox delivery and cannot request retry`() =
+        runBlocking {
+            val expectedScope = requireNotNull(AnkiquestHomeData.account()).scope
+            avatarStatus = 503
+
+            assertEquals(Result.success(), worker().doWork())
+
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), expectedScope) }
+            val inbox = requests.indexOfFirst { it.startsWith("/api/notifications/") }
+            assertTrue(inbox >= 0)
+            assertTrue(requests.indexOf("/api/avatars") > inbox)
+        }
+
+    @Test
+    fun `account change during optional photos cannot redraw the old board`() =
+        runBlocking {
+            switchAccountDuringAvatars = true
+
+            assertEquals(Result.success(), worker().doWork())
+
+            verify(exactly = 1) { AnkiquestWidget.render(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `older photo fetch cannot overwrite a newer cached leaderboard`() =
+        runBlocking {
+            replaceBoardDuringAvatars = true
+
+            assertEquals(Result.success(), worker().doWork())
+
+            verify(exactly = 1) { AnkiquestWidget.render(any(), any(), any(), any()) }
         }
 
     private fun worker(): AnkiquestPollWorker = TestListenableWorkerBuilder<AnkiquestPollWorker>(targetContext).build()

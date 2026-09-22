@@ -15,15 +15,19 @@
 package com.ichi2.anki.ankiquest
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat.Type.displayCutout
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
@@ -76,10 +80,35 @@ internal class AnkiquestBrowserSessionBridge {
 class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
     private lateinit var webView: WebView
     private var account = ""
+    private var fileResult: ValueCallback<Array<Uri>>? = null
+    private var pictureAccount: String? = null
+    private var pictureOrigin: Uri? = null
+    private val choosePicture =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            val callback = fileResult
+            val owner = pictureAccount
+            val origin = pictureOrigin
+            fileResult = null
+            pictureAccount = null
+            pictureOrigin = null
+            val current = if (::webView.isInitialized) webView.url?.toUri() else null
+            val accepted = owner != null && owner == account && owner == AnkiquestNavigation.accountFingerprint() &&
+                origin != null && acceptsPictureOrigin(current, origin)
+            callback?.onReceiveValue(uri?.takeIf { accepted }?.let { arrayOf(it) })
+        }
 
     companion object {
         const val EXTRA_PATH = "ankiquest.path"
         private val sessionBridge = AnkiquestBrowserSessionBridge()
+
+        internal fun acceptsPictureOrigin(
+            current: Uri?,
+            base: Uri,
+        ): Boolean {
+            val expected = base.toString().toHttpUrlOrNull() ?: return false
+            val actual = current?.toString()?.toHttpUrlOrNull() ?: return false
+            return actual.scheme == expected.scheme && actual.host == expected.host && actual.port == expected.port
+        }
 
         /** Only known, same-server read surfaces can be opened by a native shortcut. */
         internal fun destinationUrl(
@@ -131,6 +160,27 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         webView.settings.domStorageEnabled = true
         webView.webChromeClient =
             object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    view: WebView,
+                    callback: ValueCallback<Array<Uri>>,
+                    params: FileChooserParams,
+                ): Boolean {
+                    if (account != AnkiquestNavigation.accountFingerprint() ||
+                        !acceptsPictureOrigin(view.url?.toUri(), dashboard.toUri())
+                    ) return false
+                    cancelPictureResult()
+                    fileResult = callback
+                    pictureAccount = account
+                    pictureOrigin = view.url?.toUri()
+                    return try {
+                        choosePicture.launch("image/*")
+                        true
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        cancelPictureResult()
+                        true
+                    }
+                }
+
                 override fun onProgressChanged(
                     view: WebView,
                     newProgress: Int,
@@ -214,7 +264,23 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
 
     override fun onResume() {
         super.onResume()
-        if (account.isNotEmpty() && account != AnkiquestNavigation.accountFingerprint()) finish()
+        if (account.isNotEmpty() && account != AnkiquestNavigation.accountFingerprint()) {
+            cancelPictureResult()
+            finish()
+        }
+    }
+
+    private fun cancelPictureResult() {
+        val callback = fileResult
+        fileResult = null
+        pictureAccount = null
+        pictureOrigin = null
+        callback?.onReceiveValue(null)
+    }
+
+    override fun onDestroy() {
+        cancelPictureResult()
+        super.onDestroy()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -233,4 +299,5 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
             insets
         }
     }
+
 }

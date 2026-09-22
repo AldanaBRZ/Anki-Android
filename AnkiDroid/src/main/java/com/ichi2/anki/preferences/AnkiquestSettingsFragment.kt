@@ -17,6 +17,7 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -29,6 +30,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.ichi2.anki.R
 import com.ichi2.anki.ankiquest.Ankiquest
+import com.ichi2.anki.ankiquest.AnkiquestAvatars
 import com.ichi2.anki.ankiquest.AnkiquestDeckAdapter
 import com.ichi2.anki.ankiquest.AnkiquestDeckTree
 import com.ichi2.anki.ankiquest.AnkiquestNotifier
@@ -36,6 +38,7 @@ import com.ichi2.anki.ankiquest.AnkiquestPoll
 import com.ichi2.anki.ankiquest.AnkiquestUpdater
 import com.ichi2.preferences.VersatileTextPreference
 import com.ichi2.utils.Permissions.openAppSettingsScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
@@ -48,6 +51,38 @@ class AnkiquestSettingsFragment : SettingsFragment() {
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) AnkiquestPoll.refreshNow(requireContext())
+        }
+
+    // Deliberately memory-only: a restored picker result is discarded after process recreation.
+    private var pictureAccount: AnkiquestAvatars.Account? = null
+    private val profilePicture =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            val account = pictureAccount
+            pictureAccount = null
+            if (uri == null || account == null) return@registerForActivityResult
+            pictureAction {
+                AnkiquestAvatars.requireCurrent(account)
+                val bitmap = AnkiquestAvatars.prepare(requireContext(), uri)
+                AnkiquestAvatars.requireCurrent(account)
+                val preview =
+                    ImageView(requireContext()).apply {
+                        setImageBitmap(bitmap)
+                        adjustViewBounds = true
+                        maxHeight = (256 * resources.displayMetrics.density).toInt()
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                    }
+                AlertDialog
+                    .Builder(requireContext())
+                    .setTitle(R.string.ankiquest_avatar_title)
+                    .setView(preview)
+                    .setPositiveButton(R.string.ankiquest_deck_notifications_save) { _, _ ->
+                        pictureAction {
+                            AnkiquestAvatars.save(account, bitmap)
+                            AnkiquestPoll.refreshNow(requireContext())
+                        }
+                    }.setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
         }
 
     override fun initSubscreen() {
@@ -64,6 +99,40 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             true
         }
         bindNudges()
+        requirePreference<Preference>(R.string.ankiquest_avatar_key).setOnPreferenceClickListener {
+            pictureAction {
+                val account = checkNotNull(AnkiquestAvatars.account()) { getString(R.string.ankiquest_nudges_unavailable) }
+                AlertDialog
+                    .Builder(requireContext())
+                    .setTitle(R.string.ankiquest_avatar_title)
+                    .setItems(arrayOf(getString(R.string.ankiquest_avatar_choose), getString(R.string.ankiquest_avatar_remove))) { _, option ->
+                        if (option == 0) {
+                            pictureAction {
+                                AnkiquestAvatars.requireCurrent(account)
+                                pictureAccount = account
+                                try {
+                                    profilePicture.launch("image/*")
+                                } catch (e: Exception) {
+                                    pictureAccount = null
+                                    throw e
+                                }
+                            }
+                        } else {
+                            AlertDialog
+                                .Builder(requireContext())
+                                .setMessage(R.string.ankiquest_avatar_remove_confirm)
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .setPositiveButton(R.string.ankiquest_avatar_remove) { _, _ ->
+                                    pictureAction {
+                                        AnkiquestAvatars.remove(account)
+                                        AnkiquestPoll.refreshNow(requireContext())
+                                    }
+                                }.show()
+                        }
+                    }.show()
+            }
+            true
+        }
         bindAlertSettings(R.string.ankiquest_message_alerts_key, nudge = false)
         bindAlertSettings(R.string.ankiquest_nudge_alerts_key, nudge = true)
         bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
@@ -82,6 +151,30 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 AnkiquestUpdater.installed() ?: getString(R.string.ankiquest_local_build),
             )
         bindAction(R.string.ankiquest_check_updates_key) { AnkiquestUpdater.checkNow(requireActivity()) }
+    }
+
+    private fun pictureAction(action: suspend () -> Unit) {
+        val preference = requirePreference<Preference>(R.string.ankiquest_avatar_key)
+        if (!preference.isEnabled) return
+        preference.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                action()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (isAdded) {
+                    AlertDialog
+                        .Builder(requireContext())
+                        .setTitle(R.string.ankiquest_avatar_title)
+                        .setMessage(getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+            } finally {
+                preference.isEnabled = true
+            }
+        }
     }
 
     private fun bindAlertSettings(
