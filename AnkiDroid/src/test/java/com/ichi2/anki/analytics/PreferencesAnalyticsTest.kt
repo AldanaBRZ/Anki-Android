@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.EmptyApplicationCategory
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.ankiquest.AnkiquestNavigation
 import com.ichi2.anki.preferences.PreferenceTestUtils
 import com.ichi2.anki.preferences.SettingsFragment
 import com.ichi2.testutils.EmptyApplication
@@ -108,7 +109,8 @@ class PreferencesAnalyticsTest : RobolectricTest() {
             R.string.ankiquest_nudges_key,
             R.string.ankiquest_message_alerts_key,
             R.string.ankiquest_nudge_alerts_key,
-        ).toStringResourceSet()
+        ).toStringResourceSet() +
+            setOf(AnkiquestNavigation.OPEN_TODAY_KEY, AnkiquestNavigation.SESSION_SUMMARY_KEY)
 
     @Test
     fun `The include and excluded prefs lists don't share elements`() {

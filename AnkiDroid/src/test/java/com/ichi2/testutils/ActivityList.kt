@@ -25,6 +25,7 @@ import com.ichi2.anki.SingleFragmentActivity
 import com.ichi2.anki.StudyOptionsActivity
 import com.ichi2.anki.account.AccountActivity
 import com.ichi2.anki.ankiquest.AnkiquestActivity
+import com.ichi2.anki.ankiquest.AnkiquestHomeActivity
 import com.ichi2.anki.ankiquest.AnkiquestWidgetConfig
 import com.ichi2.anki.instantnoteeditor.InstantNoteEditorActivity
 import com.ichi2.anki.multimedia.MultimediaActivity
@@ -83,6 +84,7 @@ object ActivityList {
             get(CardAnalysisWidgetConfig::class.java) { intentForWidgetConfig() },
             get(AccountActivity::class.java),
             get(AnkiquestActivity::class.java),
+            get(AnkiquestHomeActivity::class.java),
             get(AnkiquestWidgetConfig::class.java) { intentForWidgetConfig() },
         )
 

@@ -15,10 +15,14 @@
         android:paddingStart="16dp"
         android:paddingEnd="8dp">
         <TextView
+            android:id="@+id/aq_home_brand"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:text="@string/ankiquest_screen_title"
+            android:contentDescription="@string/ankiquest_screen_title"
             android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="@color/aq_home_text" />

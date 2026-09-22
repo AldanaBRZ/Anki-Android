@@ -11,13 +11,11 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [33])
 class AnkiquestStudySessionTest : RobolectricTest() {
     private val clock = MockTime(1_750_000_000_000)
 
