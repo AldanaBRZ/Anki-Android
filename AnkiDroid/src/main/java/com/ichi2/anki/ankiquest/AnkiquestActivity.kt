@@ -15,14 +15,17 @@
 package com.ichi2.anki.ankiquest
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat.Type.displayCutout
@@ -32,10 +35,17 @@ import com.ichi2.anki.AnkiActivity
 import com.ichi2.anki.R
 import com.ichi2.anki.preferences.AnkiquestSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Shows the ankiquest dashboard: profile, quests, achievements and the leaderboard. */
 class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
     private lateinit var webView: WebView
+    private var fileResult: ValueCallback<Array<Uri>>? = null
+    private val choosePicture =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            fileResult?.onReceiveValue(uri?.let { arrayOf(it) })
+            fileResult = null
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +70,23 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         webView.settings.domStorageEnabled = true
         webView.webChromeClient =
             object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    view: WebView,
+                    callback: ValueCallback<Array<Uri>>,
+                    params: FileChooserParams,
+                ): Boolean {
+                    if (!acceptsPictureOrigin(view.url?.toUri(), base)) return false
+                    fileResult?.onReceiveValue(null)
+                    fileResult = callback
+                    return try {
+                        choosePicture.launch("image/*")
+                        true
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        fileResult = null
+                        false
+                    }
+                }
+
                 override fun onProgressChanged(
                     view: WebView,
                     newProgress: Int,
@@ -101,6 +128,12 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         }
     }
 
+    override fun onDestroy() {
+        fileResult?.onReceiveValue(null)
+        fileResult = null
+        super.onDestroy()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         if (::webView.isInitialized) webView.saveState(outState)
@@ -113,6 +146,17 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
             findViewById<View>(R.id.toolbar_container).updatePadding(left = bars.left, top = bars.top, right = bars.right)
             findViewById<View>(R.id.content).updatePadding(left = bars.left, right = bars.right, bottom = bars.bottom)
             insets
+        }
+    }
+
+    companion object {
+        internal fun acceptsPictureOrigin(
+            current: Uri?,
+            base: Uri,
+        ): Boolean {
+            val expected = base.toString().toHttpUrlOrNull() ?: return false
+            val actual = current?.toString()?.toHttpUrlOrNull() ?: return false
+            return actual.scheme == expected.scheme && actual.host == expected.host && actual.port == expected.port
         }
     }
 }
