@@ -82,7 +82,7 @@ class DeckHierarchyLinesDecoration(
         val childCount = parent.childCount
         if (childCount == 0) return
 
-        val currentList = (parent.adapter as? DeckAdapter)?.currentList ?: return
+        val currentList = adapter.currentList
         if (currentList.isEmpty()) return
 
         if (scratchBuffer.size < childCount) {
@@ -97,7 +97,8 @@ class DeckHierarchyLinesDecoration(
         // RecyclerView.getChildAt() order is not guaranteed to match adapter position order, especially during animations.
         val visibleViews =
             parent.children
-                .map { parent.getChildAdapterPosition(it) to it }
+                .filter { parent.getChildViewHolder(it).bindingAdapter === adapter }
+                .map { parent.getChildViewHolder(it).bindingAdapterPosition to it }
                 .filter { (pos, _) -> pos != RecyclerView.NO_POSITION }
                 .sortedBy { (pos, _) -> pos }
                 .toList()
