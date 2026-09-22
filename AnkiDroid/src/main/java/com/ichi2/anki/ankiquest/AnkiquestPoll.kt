@@ -112,8 +112,8 @@ object AnkiquestPoll {
             Timber.w(e, "ankiquest profile fetch failed")
         }
         return try {
-            Ankiquest.completionNotifications()?.let { (account, notifications) ->
-                AnkiquestNotifier.onDeckCompletions(context, account, notifications)
+            Ankiquest.completionNotifications()?.let { (account, notifications, scope) ->
+                AnkiquestNotifier.onDeckCompletions(context, account, notifications, scope)
             }
             Result.success()
         } catch (e: CancellationException) {

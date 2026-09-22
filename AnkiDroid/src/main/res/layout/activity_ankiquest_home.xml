@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/aq_home_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/aq_home_background">
+    <LinearLayout
+        android:id="@+id/aq_home_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/ankiquest_screen_title"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/aq_home_text" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/aq_home_activity"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/aq_home_activity" />
+        <ImageButton
+            android:id="@+id/aq_home_account"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_settings_black"
+            android:tint="@color/aq_home_text"
+            android:contentDescription="@string/aq_home_settings" />
+    </LinearLayout>
+    <ProgressBar
+        android:id="@+id/aq_home_loading"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:indeterminate="true"
+        android:visibility="gone"
+        android:contentDescription="@string/aq_home_loading_remote" />
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/aq_home_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+        <LinearLayout
+            android:id="@+id/aq_home_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp" />
+    </androidx.core.widget.NestedScrollView>
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/aq_home_navigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/ankiquest_navigation" />
+</LinearLayout>

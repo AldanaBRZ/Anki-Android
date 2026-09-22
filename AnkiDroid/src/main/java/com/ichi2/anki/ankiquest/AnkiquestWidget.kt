@@ -159,7 +159,18 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 .getInstance(context)
                 .getAppWidgetIds(ComponentName(context, style.provider))
 
-        private fun ankiHome(context: Context): Intent = Intent(context, DeckPicker::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        internal fun widgetDestination(
+            context: Context,
+            period: String,
+        ): Intent =
+            (
+                if (AnkiquestNavigation.enabled()) {
+                    Intent(context, AnkiquestActivity::class.java)
+                        .putExtra(AnkiquestActivity.EXTRA_PATH, "/${PERIODS.firstOrNull { it.name == period }?.name ?: "week"}")
+                } else {
+                    Intent(context, DeckPicker::class.java)
+                }
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         private fun showRefreshing(context: Context) {
             for (style in styles) {
@@ -217,8 +228,8 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 R.id.ankiquest_widget_root,
                 PendingIntent.getActivity(
                     context,
-                    0,
-                    ankiHome(context),
+                    1000 + period.hashCode(),
+                    widgetDestination(context, period),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
@@ -226,8 +237,8 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 R.id.ankiquest_widget_list,
                 PendingIntentCompat.getActivity(
                     context,
-                    2,
-                    ankiHome(context),
+                    2000 + period.hashCode(),
+                    widgetDestination(context, period),
                     PendingIntent.FLAG_UPDATE_CURRENT,
                     true,
                 ),

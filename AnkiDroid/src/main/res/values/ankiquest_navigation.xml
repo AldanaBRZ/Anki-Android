@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ankiquest_nav_today">Today</string>
+    <string name="ankiquest_nav_friends">Friends</string>
+    <string name="ankiquest_nav_progress">Progress</string>
+    <string name="ankiquest_nav_decks">Decks</string>
+    <string name="ankiquest_open_today_title">Open Today on launch</string>
+    <string name="ankiquest_open_today_summary">Start with study and friend goals. Turn off to open your deck library.</string>
+    <string name="ankiquest_summary_title">Your study session</string>
+    <string name="ankiquest_summary_body">%1$d reviews · %2$s\n%3$d cards still available in this deck.\n\nSaved on this device. Shared progress updates after upload.</string>
+    <string name="ankiquest_summary_under_minute">less than a minute</string>
+    <plurals name="ankiquest_summary_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <string name="ankiquest_summary_continue">Continue studying</string>
+    <string name="ankiquest_summary_done">Done</string>
+    <string name="ankiquest_summary_progress">View progress</string>
+    <string name="ankiquest_summary_preference_title">Session summary</string>
+    <string name="ankiquest_summary_preference_summary">Show a quiet, accessible recap when you leave a study session.</string>
+    <string name="ankiquest_browse_cards">Browse cards</string>
+    <string name="ankiquest_missing_deck">This deck is no longer available. Choose another deck.</string>
+    <string name="ankiquest_deck_ready_later">No cards are ready in this deck right now. Choose another deck or come back later.</string>
+    <string name="ankiquest_streak_gentle">A little study is waiting when you have time. Your previous progress is still yours.</string>
+    <string name="ankiquest_streak_protected">A freeze is available if you need a break.</string>
+</resources>

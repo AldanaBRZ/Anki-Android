@@ -60,7 +60,7 @@ class AnkiquestPollTest : RobolectricTest() {
         every { AnkiquestWidget.render(any(), any(), any(), any()) } just Runs
         every { AnkiquestNotifier.onLeaderboard(any(), any()) } just Runs
         every { AnkiquestNotifier.onProfile(any(), any()) } just Runs
-        every { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) } just Runs
+        every { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) } just Runs
 
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
@@ -111,7 +111,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
         }
 
     @Test
@@ -122,7 +122,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
         }
 
     @Test
@@ -132,7 +132,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
         }
 
     @Test
@@ -142,7 +142,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.retry(), worker().doWork())
 
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -176,7 +176,7 @@ class AnkiquestPollTest : RobolectricTest() {
                 inboxStatus = status
                 assertEquals(Result.success(), worker().doWork(), "HTTP $status needs settings or server support")
             }
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -186,7 +186,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -197,7 +197,7 @@ class AnkiquestPollTest : RobolectricTest() {
             assertEquals(Result.success(), worker().doWork())
 
             assertTrue(requests.none { it.startsWith("/api/notifications/") })
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -208,8 +208,8 @@ class AnkiquestPollTest : RobolectricTest() {
             assertEquals(Result.success(), worker().doWork())
 
             assertEquals("other", Ankiquest.player())
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), "$url/other", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), "$url/other", any(), any()) }
         }
 
     @Test
@@ -225,7 +225,7 @@ class AnkiquestPollTest : RobolectricTest() {
     @Test
     fun `cancellation during inbox delivery is propagated`(): Unit =
         runBlocking {
-            every { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) } throws CancellationException("Worker stopped")
+            every { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) } throws CancellationException("Worker stopped")
 
             assertFailsWith<CancellationException> { worker().doWork() }
         }

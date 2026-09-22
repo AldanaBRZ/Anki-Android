@@ -20,6 +20,16 @@
         android:inputType="textPassword" />
     <SwitchPreferenceCompat
         android:defaultValue="true"
+        android:key="ankiquestOpenToday"
+        android:summary="@string/ankiquest_open_today_summary"
+        android:title="@string/ankiquest_open_today_title" />
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="ankiquestSessionSummary"
+        android:summary="@string/ankiquest_summary_preference_summary"
+        android:title="@string/ankiquest_summary_preference_title" />
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
         android:key="@string/ankiquest_notify_rank_key"
         android:summary="@string/ankiquest_notify_rank_summary"
         android:title="@string/ankiquest_notify_rank_title" />

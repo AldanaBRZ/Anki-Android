@@ -30,6 +30,15 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [32])
 class AnkiquestNotifierTest : RobolectricTest() {
+    private fun replyAccount(): HomeAccount {
+        AnkiDroidApp.sharedPrefs().edit {
+            putString(Ankiquest.URL_KEY, "https://server.test")
+            putString(Ankiquest.USER_KEY, "hill")
+            putString(Ankiquest.TOKEN_KEY, "hill-token")
+        }
+        return AnkiquestHomeData.account()!!
+    }
+
     @Test
     fun `first poll delivers fresh completion and discards stale backlog`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
@@ -101,13 +110,15 @@ class AnkiquestNotifierTest : RobolectricTest() {
     @Test
     fun `a completion can be answered until it has been`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
+        val account = replyAccount()
         AnkiquestNotifier.onDeckCompletions(
             targetContext,
-            "server/hill",
+            account.notificationAccount,
             JSONArray()
                 .put(message(1, 30).put("sender", "cerro"))
                 .put(message(2, 30).put("sender", "cerro").put("replied", true))
                 .put(message(3, 30)),
+            account.scope,
         )
         val posted = (1..3).map { shadowOf(manager).getNotification(5_140_000 + it) }
         assertEquals(3, shadowOf(manager).size())
@@ -124,6 +135,8 @@ class AnkiquestNotifierTest : RobolectricTest() {
         val data = AnkiquestReply.data(cheer, AnkiquestReply.message(cheer))
         assertEquals(1L, data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0))
         assertEquals("Deck complete", data.getString(AnkiquestReply.TITLE_KEY))
+        assertEquals(account.scope, data.getString(AnkiquestReply.SCOPE_KEY))
+        assertEquals(account.notificationAccount, data.getString(AnkiquestReply.ACCOUNT_KEY))
 
         val typed =
             shadowOf(posted[0].actions[1].actionIntent).savedIntent.also {
@@ -139,6 +152,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
     @Test
     fun `a sent reply replaces the buttons and a failed one keeps them`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
+        val account = replyAccount()
         val data =
             Data
                 .Builder()
@@ -147,6 +161,8 @@ class AnkiquestNotifierTest : RobolectricTest() {
                 .putString(AnkiquestReply.TITLE_KEY, "Deck complete")
                 .putString(AnkiquestReply.BODY_KEY, "Cerro has finished Spanish for today.")
                 .putString(AnkiquestReply.MESSAGE_KEY, "Good job!")
+                .putString(AnkiquestReply.ACCOUNT_KEY, account.notificationAccount)
+                .putString(AnkiquestReply.SCOPE_KEY, account.scope)
                 .build()
 
         AnkiquestNotifier.onReplySent(targetContext, data, "Cerro")
@@ -167,7 +183,14 @@ class AnkiquestNotifierTest : RobolectricTest() {
     @Suppress("DEPRECATION") // pre-O alerts are configured on the notification itself
     fun `reply acknowledgements stay silent when incoming notifications become alerts`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
-        val data = Data.Builder().putInt(AnkiquestReply.TAG_KEY, 5_140_007).build()
+        val account = replyAccount()
+        val data =
+            Data
+                .Builder()
+                .putInt(AnkiquestReply.TAG_KEY, 5_140_007)
+                .putString(AnkiquestReply.ACCOUNT_KEY, account.notificationAccount)
+                .putString(AnkiquestReply.SCOPE_KEY, account.scope)
+                .build()
         AnkiquestNotifier.onReplySent(targetContext, data, "Cerro")
         val posted = shadowOf(manager).getNotification(5_140_007)
         assertNull(posted.vibrate)
