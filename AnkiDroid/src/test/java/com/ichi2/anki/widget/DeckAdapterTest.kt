@@ -18,12 +18,11 @@ package com.ichi2.anki.widget
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.awaitDeckHolder
 import com.ichi2.anki.deckpicker.DeckFilters
 import com.ichi2.anki.deckpicker.filterAndFlattenDisplay
-import com.ichi2.anki.libanki.DeckId
 import com.ichi2.anki.widgets.DeckAdapter
 import com.ichi2.anki.withDeckPicker
 import org.junit.Test
@@ -66,14 +65,14 @@ class DeckAdapterTest : RobolectricTest() {
 
         withDeckPicker(deckCount = 0) { deckPicker ->
             val adapter = (deckPicker.deckPickerBinding.decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
-            val pressedRow = deckPicker.deckHolder(pressedDeck).itemView
+            val pressedRow = deckPicker.awaitDeckHolder(pressedDeck).itemView
             pressedRow.isPressed = true
             val originalRipple = pressedRow.background
 
             adapter.updateSelectedDeck(pressedDeck)
             advanceRobolectricLooperUntil { adapter.currentList.single { it.did == pressedDeck }.isSelected }
 
-            val selectedBackground = deckPicker.deckHolder(pressedDeck).itemView.background
+            val selectedBackground = deckPicker.awaitDeckHolder(pressedDeck).itemView.background
             // A replacement drawable must not inherit the press and start a second ripple.
             assertTrue(
                 selectedBackground === originalRipple || android.R.attr.state_pressed !in selectedBackground.state,
@@ -90,7 +89,7 @@ class DeckAdapterTest : RobolectricTest() {
 
         withDeckPicker(deckCount = 0) { deckPicker ->
             val adapter = (deckPicker.deckPickerBinding.decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
-            val parent = deckPicker.deckHolder(parentDeck)
+            val parent = deckPicker.awaitDeckHolder(parentDeck)
             val changePayloads = mutableListOf<Any?>()
             adapter.observeItemRangeChanges { _, _, payload -> changePayloads.add(payload) }
 
@@ -103,7 +102,7 @@ class DeckAdapterTest : RobolectricTest() {
 
                 assertTrue(changePayloads.isNotEmpty())
                 assertTrue(changePayloads.all { it != null }, "A full row update interrupts the arrow ripple")
-                assertSame(parent, deckPicker.deckHolder(parentDeck))
+                assertSame(parent, deckPicker.awaitDeckHolder(parentDeck))
                 assertEquals(
                     deckPicker.getString(if (wasCollapsed) R.string.collapse else R.string.expand),
                     parent.binding.deckExpander.contentDescription,
@@ -111,24 +110,6 @@ class DeckAdapterTest : RobolectricTest() {
                 changePayloads.clear()
             }
         }
-    }
-
-    private fun DeckPicker.deckHolder(deckId: DeckId): DeckAdapter.ViewHolder {
-        val decks = deckPickerBinding.decks
-        val adapter = (decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
-        var holder: DeckAdapter.ViewHolder? = null
-        // Draining the main looper once can finish before the background list diff posts its layout.
-        advanceRobolectricLooperUntil(lazyMessage = { "Deck $deckId was not laid out" }) {
-            val position = adapter.currentList.indexOfFirst { it.did == deckId }
-            holder =
-                if (position >= 0 && !decks.hasPendingAdapterUpdates()) {
-                    decks.findViewHolderForAdapterPosition(position) as? DeckAdapter.ViewHolder
-                } else {
-                    null
-                }
-            holder != null
-        }
-        return checkNotNull(holder)
     }
 
     private fun RecyclerView.Adapter<*>.observeItemRangeChanges(listener: (Int, Int, Any?) -> Unit) {

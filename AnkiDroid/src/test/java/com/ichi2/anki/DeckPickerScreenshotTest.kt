@@ -198,10 +198,11 @@ class DeckPickerScreenshotTest : ScreenshotTest() {
     private fun DeckPicker.scrollLastDeckOntoStudiedLine() {
         val list = deckPickerBinding.decks
         val deckAdapter = (list.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
+        advanceRobolectricLooperUntil { deckAdapter.currentList.isNotEmpty() }
+        val lastDeckId = deckAdapter.currentList.last().did
         val lastDeckPosition = deckAdapter.itemCount - 1
         (list.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(lastDeckPosition, 0)
-        advanceRobolectricLooper()
-        val lastDeck = requireNotNull(list.findViewHolderForAdapterPosition(lastDeckPosition)).itemView
+        val lastDeck = awaitDeckHolder(lastDeckId).itemView
         val studiedLine = deckPickerBinding.reviewSummaryTextView
         list.scrollBy(0, lastDeck.contentCenterYInWindow - studiedLine.contentCenterYInWindow)
         advanceRobolectricLooper()
