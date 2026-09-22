@@ -3,6 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:title="@string/ankiquest_screen_title"
     android:key="@string/ankiquest_screen_key">
+    <Preference
+        android:key="@string/ankiquest_dashboard_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_dashboard_title" />
     <com.ichi2.preferences.VersatileTextPreference
         android:key="@string/ankiquest_url_key"
         android:title="@string/ankiquest_url_title"
@@ -34,6 +38,16 @@
         android:key="@string/ankiquest_nudges_key"
         android:summary="@string/ankiquest_nudges_summary"
         android:title="@string/ankiquest_nudges_title" />
+    <SwitchPreferenceCompat
+        android:key="@string/ankiquest_streak_protection_key"
+        android:persistent="false"
+        android:summary="@string/ankiquest_streak_protection_summary"
+        android:title="@string/ankiquest_streak_protection_title" />
+    <Preference
+        android:key="@string/ankiquest_community_reminders_key"
+        android:persistent="false"
+        android:summary="@string/ankiquest_community_reminders_summary"
+        android:title="@string/ankiquest_community_reminders_title" />
     <Preference
         android:key="@string/ankiquest_message_alerts_key"
         android:persistent="false"
