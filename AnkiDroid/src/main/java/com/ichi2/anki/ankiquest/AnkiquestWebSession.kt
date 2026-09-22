@@ -15,6 +15,7 @@ internal data class AnkiquestWebSession(
     private val base = dashboard.toHttpUrlOrNull()
     private val routes = listOf("hour", "day", "week", "month", "year", "all", "records", "community")
     private val paths = base?.let { url -> listOf(url.encodedPath) + routes.map { url.encodedPath + it } }.orEmpty()
+    private val calendarQueries = listOf("period=day", "period=week", "period=month")
 
     val community: String
         get() = dashboard.substringBefore('#') + "community#reminders"
@@ -22,11 +23,14 @@ internal data class AnkiquestWebSession(
     fun allows(url: String?): Boolean {
         val expected = base ?: return false
         val actual = url?.toHttpUrlOrNull() ?: return false
+        val queryAllowed =
+            actual.encodedQuery == null ||
+                (actual.encodedPath == expected.encodedPath + "community" && actual.encodedQuery in calendarQueries)
         return expected.username.isEmpty() && expected.password.isEmpty() &&
             expected.encodedQuery == null &&
             actual.username.isEmpty() && actual.password.isEmpty() &&
             actual.scheme == expected.scheme && actual.host == expected.host && actual.port == expected.port &&
-            actual.encodedPath in paths && actual.encodedQuery == null
+            actual.encodedPath in paths && queryAllowed
     }
 
     fun script(url: String?): String? {
@@ -46,8 +50,11 @@ internal data class AnkiquestWebSession(
         return """
             (() => {
                 const page = new URL(window.location.href);
+                const queryAllowed = !page.href.split('#')[0].includes('?') ||
+                    (page.pathname === ${JSONObject.quote(expected.encodedPath + "community")} &&
+                        ${JSONArray(calendarQueries)}.includes(page.search.slice(1)));
                 if (page.username || page.password || page.origin !== ${JSONObject.quote(origin)} ||
-                    !${JSONArray(paths)}.includes(page.pathname) || page.search !== '') return;
+                    !${JSONArray(paths)}.includes(page.pathname) || !queryAllowed) return;
                 window.ankiquestSession = $session;
                 window.dispatchEvent(new CustomEvent('ankiquest-auth'));
             })();

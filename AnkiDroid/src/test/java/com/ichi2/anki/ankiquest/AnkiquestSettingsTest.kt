@@ -93,6 +93,36 @@ class AnkiquestSettingsTest : RobolectricTest() {
     }
 
     @Test
+    fun `community calendar links keep the saved account only for a single supported period`() {
+        val session = AnkiquestWebSession("https://quest.example/anki/#cerro", "cerro", "secret")
+        for (period in listOf("day", "week", "month")) {
+            val url = "https://quest.example/anki/community?period=$period#calendar"
+            assertTrue(session.allows(url), url)
+            assertNotNull(session.script(url))
+        }
+        for (url in listOf(
+            "https://quest.example/anki/community?period=year#calendar",
+            "https://quest.example/anki/community?period=#calendar",
+            "https://quest.example/anki/community?#calendar",
+            "https://quest.example/anki/community?period=day&period=week#calendar",
+            "https://quest.example/anki/community?period=day&period=day#calendar",
+            "https://quest.example/anki/community?period=day&next=external#calendar",
+            "https://quest.example/anki/community?next=external&period=day#calendar",
+            "https://quest.example/anki/community?period=day&#calendar",
+            "https://quest.example/anki/community?period=day?next=external#calendar",
+            "https://quest.example/anki/community?%70eriod=day#calendar",
+            "https://quest.example/anki/community?period=%64ay#calendar",
+            "https://quest.example/anki/community?page=day#calendar",
+            "https://quest.example/anki/week?period=day#calendar",
+            "https://quest.example/anki/?period=day#calendar",
+            "https://other.example/anki/community?period=day#calendar",
+        )) {
+            assertFalse(session.allows(url), url)
+            assertNull(session.script(url), url)
+        }
+    }
+
+    @Test
     fun `removing saved credentials clears the page session`() {
         val session = AnkiquestWebSession("https://quest.example/#cerro", "cerro", "")
         assertTrue(assertNotNull(session.script("https://quest.example/")).contains("window.ankiquestSession = null"))
