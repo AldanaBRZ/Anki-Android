@@ -12,6 +12,11 @@
     <string name="ankiquest_nudges_title" translatable="false" maxLength="41">Nudges</string>
     <string name="ankiquest_nudges_summary" translatable="false">Tell me when a place, my best day or the next level is within reach</string>
     <string name="ankiquest_nudges_unavailable" translatable="false">Set the server, player and token first</string>
+    <string name="ankiquest_message_alerts_key" translatable="false">ankiquestMessageAlerts</string>
+    <string name="ankiquest_nudge_alerts_key" translatable="false">ankiquestNudgeAlerts</string>
+    <string name="ankiquest_message_alerts_title" translatable="false" maxLength="41">Message and study alerts</string>
+    <string name="ankiquest_nudge_alerts_title" translatable="false" maxLength="41">Nudge alerts</string>
+    <string name="ankiquest_alerts_summary" translatable="false">Choose sound, vibration and pop-up banners in Android settings</string>
     <string name="ankiquest_deck_collapse" translatable="false">Collapse subdecks</string>
     <string name="ankiquest_deck_expand" translatable="false">Expand subdecks</string>
     <string name="ankiquest_deck_apply_subdecks" translatable="false">Apply to subdecks</string>

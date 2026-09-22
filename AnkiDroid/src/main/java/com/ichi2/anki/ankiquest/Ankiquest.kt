@@ -543,7 +543,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             JSONObject(response.body.string())
         }
 
-    private class HttpStatusException(
+    internal class HttpStatusException(
         val code: Int,
     ) : IOException("HTTP $code")
 

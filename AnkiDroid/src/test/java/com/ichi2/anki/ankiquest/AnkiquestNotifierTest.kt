@@ -4,9 +4,12 @@ package com.ichi2.anki.ankiquest
 
 import android.annotation.SuppressLint
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.RemoteInput
 import android.os.Bundle
+import android.provider.Settings
+import androidx.core.content.edit
 import androidx.core.content.getSystemService
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Data
@@ -50,6 +53,48 @@ class AnkiquestNotifierTest : RobolectricTest() {
         assertEquals(0L, AnkiDroidApp.sharedPrefs().getLong("ankiquestCompletionCursor:server/cerro", 0))
         shadowOf(manager).setNotificationsEnabled(true)
         AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", inbox)
+        assertEquals(1, shadowOf(manager).size())
+    }
+
+    @Test
+    fun `an established inbox delivers messages missed for more than a day`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", JSONArray().put(message(1, 30)))
+        manager.cancelAll()
+        val missed = message(2, 0)
+        collectionTime.addD(2)
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", JSONArray().put(missed))
+        assertEquals(1, shadowOf(manager).size())
+        assertEquals(2L, AnkiDroidApp.sharedPrefs().getLong("ankiquestCompletionCursor:server/cerro", 0))
+    }
+
+    @Test
+    fun `messages do not expire while waiting for phone notification permission`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        val inbox = JSONArray().put(message(1, 30))
+        shadowOf(manager).setNotificationsEnabled(false)
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", inbox)
+        collectionTime.addD(2)
+        shadowOf(manager).setNotificationsEnabled(true)
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", inbox)
+        assertEquals(1, shadowOf(manager).size())
+    }
+
+    @Test
+    fun `a successful empty inbox starts the delivery window`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", JSONArray())
+        val missed = message(1, 0)
+        collectionTime.addD(2)
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", JSONArray().put(missed))
+        assertEquals(1, shadowOf(manager).size())
+    }
+
+    @Test
+    fun `an existing installation keeps unseen retained messages after updating`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiDroidApp.sharedPrefs().edit(commit = true) { putLong("ankiquestCompletionCursor:server/cerro", 1L) }
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", JSONArray().put(message(2, 90_000)))
         assertEquals(1, shadowOf(manager).size())
     }
 
@@ -118,8 +163,26 @@ class AnkiquestNotifierTest : RobolectricTest() {
     }
 
     @Test
+    @Config(sdk = [24])
+    @Suppress("DEPRECATION") // pre-O alerts are configured on the notification itself
+    fun `reply acknowledgements stay silent when incoming notifications become alerts`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        val data = Data.Builder().putInt(AnkiquestReply.TAG_KEY, 5_140_007).build()
+        AnkiquestNotifier.onReplySent(targetContext, data, "Cerro")
+        val posted = shadowOf(manager).getNotification(5_140_007)
+        assertNull(posted.vibrate)
+        assertNull(posted.sound)
+        assertEquals(0, posted.defaults and (Notification.DEFAULT_SOUND or Notification.DEFAULT_VIBRATE))
+        AnkiquestNotifier.onReplyFailed(targetContext, data)
+        val failed = shadowOf(manager).getNotification(5_140_007)
+        assertNull(failed.vibrate)
+        assertNull(failed.sound)
+        assertEquals(0, failed.defaults and (Notification.DEFAULT_SOUND or Notification.DEFAULT_VIBRATE))
+    }
+
+    @Test
     @SuppressLint("NewApi") // channels require O, guaranteed by @Config
-    fun `a nudge buzzes on its own channel while the rest stay quiet`() {
+    fun `new general and nudge channels vibrate and request heads up alerts`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         AnkiquestNotifier.onDeckCompletions(
             targetContext,
@@ -132,16 +195,15 @@ class AnkiquestNotifierTest : RobolectricTest() {
         assertEquals("ankiquest", shadowOf(manager).getNotification(5_140_001).channelId)
         assertEquals("ankiquestNudges", shadowOf(manager).getNotification(5_140_002).channelId)
         assertTrue(manager.getNotificationChannel("ankiquestNudges").shouldVibrate())
-        assertFalse(
-            manager.getNotificationChannel("ankiquest").shouldVibrate(),
-            "the rest stay as quiet as they were",
-        )
+        assertTrue(manager.getNotificationChannel("ankiquest").shouldVibrate())
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, manager.getNotificationChannel("ankiquest").importance)
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, manager.getNotificationChannel("ankiquestNudges").importance)
     }
 
     @Test
     @Config(sdk = [24])
     @Suppress("DEPRECATION") // Notification.vibrate is how a pre-O phone buzzes
-    fun `a nudge carries its own buzz where there are no channels`() {
+    fun `all incoming alerts request sound buzz and heads up before channels existed`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         AnkiquestNotifier.onDeckCompletions(
             targetContext,
@@ -151,11 +213,96 @@ class AnkiquestNotifierTest : RobolectricTest() {
                 .put(message(2, 30).put("kind", "nudge")),
         )
 
-        assertNull(shadowOf(manager).getNotification(5_140_001).vibrate)
-        assertEquals(
-            listOf(0L, 250L, 150L, 250L),
-            shadowOf(manager).getNotification(5_140_002).vibrate?.toList(),
+        for (id in 1..2) {
+            val notification = shadowOf(manager).getNotification(5_140_000 + id)
+            assertEquals(listOf(0L, 250L, 150L, 250L), notification.vibrate?.toList())
+            assertEquals(Notification.PRIORITY_HIGH, notification.priority)
+            assertTrue(notification.defaults and Notification.DEFAULT_SOUND != 0)
+        }
+    }
+
+    @Test
+    @SuppressLint("NewApi") // channels require O, guaranteed by @Config
+    fun `a muted nudge does not block later server messages`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        manager.createNotificationChannel(NotificationChannel("ankiquestNudges", "Nudges", NotificationManager.IMPORTANCE_NONE))
+        val inbox = JSONArray().put(message(1, 30).put("kind", "nudge")).put(message(2, 30).put("kind", "message"))
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", inbox)
+        assertEquals(1, shadowOf(manager).size())
+        assertNull(shadowOf(manager).getNotification(5_140_001))
+        assertEquals("Deck complete", shadowOf(manager).getNotification(5_140_002).extras.getString(Notification.EXTRA_TITLE))
+        assertEquals(2L, AnkiDroidApp.sharedPrefs().getLong("ankiquestCompletionCursor:server/cerro", 0))
+    }
+
+    @Test
+    @SuppressLint("NewApi") // channels require O, guaranteed by @Config
+    fun `muted general messages do not block a later nudge`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        manager.createNotificationChannel(NotificationChannel("ankiquest", "ankiquest", NotificationManager.IMPORTANCE_NONE))
+        AnkiquestNotifier.onDeckCompletions(
+            targetContext,
+            "server/cerro",
+            JSONArray().put(message(1, 30)).put(message(2, 30).put("kind", "nudge")),
         )
+        assertEquals(1, shadowOf(manager).size())
+        assertEquals("ankiquestNudges", shadowOf(manager).getNotification(5_140_002).channelId)
+        assertEquals(NotificationManager.IMPORTANCE_NONE, manager.getNotificationChannel("ankiquest").importance)
+    }
+
+    @Test
+    @SuppressLint("NewApi") // channels require O, guaranteed by @Config
+    fun `existing quiet channel choices are not replaced or upgraded`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        val channel =
+            NotificationChannel("ankiquest", "My quiet alerts", NotificationManager.IMPORTANCE_LOW).apply {
+                enableVibration(false)
+                setSound(null, null)
+            }
+        manager.createNotificationChannel(channel)
+        AnkiquestNotifier.onDeckCompletions(targetContext, "server/cerro", JSONArray().put(message(1, 30)))
+        val saved = manager.getNotificationChannel("ankiquest")
+        assertEquals(NotificationManager.IMPORTANCE_LOW, saved.importance)
+        assertFalse(saved.shouldVibrate())
+        assertNull(saved.sound)
+        assertEquals(listOf("ankiquest"), manager.notificationChannels.map { it.id }.filter { it.startsWith("ankiquest") })
+    }
+
+    @Test
+    fun `a denied streak reminder can be delivered once notifications are enabled`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiDroidApp.sharedPrefs().edit(commit = true) { putString(AnkiquestNotifier.STREAK_HOURS_KEY, "24") }
+        val profile = JSONObject().put("at_risk", true).put("streak", 7)
+        shadowOf(manager).setNotificationsEnabled(false)
+        AnkiquestNotifier.onProfile(targetContext, profile)
+        assertFalse(AnkiDroidApp.sharedPrefs().contains("ankiquestStreakNotifiedDay"))
+        shadowOf(manager).setNotificationsEnabled(true)
+        AnkiquestNotifier.onProfile(targetContext, profile)
+        assertEquals(1, shadowOf(manager).size())
+        manager.cancelAll()
+        AnkiquestNotifier.onProfile(targetContext, profile)
+        assertEquals(0, shadowOf(manager).size())
+    }
+
+    @Test
+    @SuppressLint("NewApi") // channels require O, guaranteed by @Config
+    fun `alert settings open the selected existing Android channel`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        for ((nudge, id) in listOf(false to "ankiquest", true to "ankiquestNudges")) {
+            val intent = AnkiquestNotifier.alertSettingsIntent(targetContext, nudge)
+            assertEquals(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, intent.action)
+            assertEquals(targetContext.packageName, intent.getStringExtra(Settings.EXTRA_APP_PACKAGE))
+            assertEquals(id, intent.getStringExtra(Settings.EXTRA_CHANNEL_ID))
+            assertEquals(NotificationManager.IMPORTANCE_HIGH, manager.getNotificationChannel(id).importance)
+            assertTrue(manager.getNotificationChannel(id).shouldVibrate())
+        }
+    }
+
+    @Test
+    @Config(sdk = [24])
+    fun `alert settings open app details on phones without channels`() {
+        val intent = AnkiquestNotifier.alertSettingsIntent(targetContext, false)
+        assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
+        assertEquals("package:${targetContext.packageName}", intent.data.toString())
     }
 
     private fun message(
