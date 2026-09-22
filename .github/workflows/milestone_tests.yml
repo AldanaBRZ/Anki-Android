@@ -1,4 +1,4 @@
-name: Milestone workflow tests
+name: Workflow regression tests
 
 on:
   workflow_dispatch:
@@ -7,11 +7,21 @@ on:
       - '.github/workflows/milestone.yml'
       - '.github/workflows/milestone_tests.yml'
       - '.github/tests/milestone.test.cjs'
+      - '.github/workflows/assignees.yml'
+      - '.github/tests/assignees.test.cjs'
+      - '.github/workflows/screenshot_*.yml'
+      - '.github/tests/screenshots.test.cjs'
+      - '.github/tests/screenshot-storage.test.cjs'
   push:
     paths:
       - '.github/workflows/milestone.yml'
       - '.github/workflows/milestone_tests.yml'
       - '.github/tests/milestone.test.cjs'
+      - '.github/workflows/assignees.yml'
+      - '.github/tests/assignees.test.cjs'
+      - '.github/workflows/screenshot_*.yml'
+      - '.github/tests/screenshots.test.cjs'
+      - '.github/tests/screenshot-storage.test.cjs'
 
 permissions:
   contents: read
@@ -22,5 +32,5 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test milestone assignment
-        run: node --test .github/tests/milestone.test.cjs
+      - name: Test repository workflows
+        run: node --test .github/tests/*.test.cjs

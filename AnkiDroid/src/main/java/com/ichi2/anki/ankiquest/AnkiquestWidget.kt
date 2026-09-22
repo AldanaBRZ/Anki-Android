@@ -278,10 +278,11 @@ open class AnkiquestWidget : AppWidgetProvider() {
             val items = RemoteCollectionItems.Builder().setViewTypeCount(1)
             val me = Ankiquest.player()
             val numbers = NumberFormat.getIntegerInstance()
-            val leaderXp = board.optJSONObject(0)?.getLong("week_xp")?.coerceAtLeast(1) ?: 1
+            val xpOf = { entry: JSONObject -> entry.optLong("xp", entry.optLong("week_xp")) }
+            val leaderXp = board.optJSONObject(0)?.let(xpOf)?.coerceAtLeast(1) ?: 1
             for (i in 0 until board.length()) {
                 val entry = board.getJSONObject(i)
-                val weekXp = entry.getLong("week_xp")
+                val xp = xpOf(entry)
                 val streak = entry.optInt("streak")
                 val views = RemoteViews(context.packageName, style.rowLayout)
                 views.setInt(
@@ -296,8 +297,8 @@ open class AnkiquestWidget : AppWidgetProvider() {
                     R.id.ankiquest_widget_level,
                     context.getString(R.string.ankiquest_widget_level, entry.getInt("level")),
                 )
-                views.setProgressBar(R.id.ankiquest_widget_bar, 1000, (weekXp * 1000 / leaderXp).toInt(), false)
-                views.setTextViewText(R.id.ankiquest_widget_xp, numbers.format(weekXp))
+                views.setProgressBar(R.id.ankiquest_widget_bar, 1000, (xp * 1000 / leaderXp).toInt(), false)
+                views.setTextViewText(R.id.ankiquest_widget_xp, numbers.format(xp))
                 views.setOnClickFillInIntent(R.id.ankiquest_widget_row, Intent())
                 items.addItem(i.toLong(), views)
             }
