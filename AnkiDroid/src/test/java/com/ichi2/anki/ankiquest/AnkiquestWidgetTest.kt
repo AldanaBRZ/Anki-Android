@@ -11,6 +11,7 @@ import android.view.View
 import android.view.View.MeasureSpec
 import android.widget.FrameLayout
 import android.widget.ListView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.widget.RemoteViewsCompat
 import androidx.test.core.app.ApplicationProvider
@@ -78,6 +79,38 @@ class AnkiquestWidgetTest : RobolectricTest() {
         assertEquals(listOf("fast", "slow"), AnkiquestWidget.forPeriod(board, "week").names())
         assertEquals(listOf("slow", "fast"), AnkiquestWidget.forPeriod(board, "day").names())
         assertEquals(99, AnkiquestWidget.forPeriod(board, "day").getJSONObject(0).getLong("xp"))
+    }
+
+    @Test
+    fun `selected period determines rendered xp and progress in both widget styles`() {
+        val board =
+            JSONArray(
+                listOf(
+                    player("slow", week = 10, day = 99),
+                    player("fast", week = 500, day = 1),
+                ),
+            )
+        for (style in AnkiquestWidget.styles) {
+            val items = AnkiquestWidget.collection(targetContext, AnkiquestWidget.forPeriod(board, "day"), style)
+            val leader = items.getItemView(0).apply(targetContext, FrameLayout(targetContext))
+            val follower = items.getItemView(1).apply(targetContext, FrameLayout(targetContext))
+
+            assertEquals("slow", leader.text(R.id.ankiquest_widget_name))
+            assertEquals("99", leader.text(R.id.ankiquest_widget_xp))
+            assertEquals(1000, leader.findViewById<ProgressBar>(R.id.ankiquest_widget_bar).progress)
+            assertEquals("fast", follower.text(R.id.ankiquest_widget_name))
+            assertEquals("1", follower.text(R.id.ankiquest_widget_xp))
+            assertEquals(10, follower.findViewById<ProgressBar>(R.id.ankiquest_widget_bar).progress)
+        }
+    }
+
+    @Test
+    fun `older leaderboard data still renders weekly xp and progress`() {
+        val items = AnkiquestWidget.collection(targetContext, leaderboard())
+        val row = items.getItemView(3).apply(targetContext, FrameLayout(targetContext))
+
+        assertEquals("500", row.text(R.id.ankiquest_widget_xp))
+        assertEquals(625, row.findViewById<ProgressBar>(R.id.ankiquest_widget_bar).progress)
     }
 
     private fun player(

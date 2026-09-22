@@ -7,14 +7,20 @@ on:
       - '.github/workflows/milestone.yml'
       - '.github/workflows/milestone_tests.yml'
       - '.github/tests/milestone.test.cjs'
-      - '.github/workflows/screenshot_store.yml'
+      - '.github/workflows/assignees.yml'
+      - '.github/tests/assignees.test.cjs'
+      - '.github/workflows/screenshot_*.yml'
+      - '.github/tests/screenshots.test.cjs'
       - '.github/tests/screenshot-storage.test.cjs'
   push:
     paths:
       - '.github/workflows/milestone.yml'
       - '.github/workflows/milestone_tests.yml'
       - '.github/tests/milestone.test.cjs'
-      - '.github/workflows/screenshot_store.yml'
+      - '.github/workflows/assignees.yml'
+      - '.github/tests/assignees.test.cjs'
+      - '.github/workflows/screenshot_*.yml'
+      - '.github/tests/screenshots.test.cjs'
       - '.github/tests/screenshot-storage.test.cjs'
 
 permissions:
