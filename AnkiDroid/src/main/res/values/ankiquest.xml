@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ankiquest_dashboard_key" translatable="false">ankiquestDashboard</string>
+    <string name="ankiquest_dashboard_title" translatable="false" maxLength="41">Leaderboard</string>
+    <string name="ankiquest_community_reminders_key" translatable="false">ankiquestCommunityReminders</string>
+    <string name="ankiquest_community_reminders_title" translatable="false" maxLength="41">Community reminders</string>
+    <string name="ankiquest_community_reminders_summary" translatable="false">Choose reminders for community events</string>
+    <string name="ankiquest_streak_protection_key" translatable="false">ankiquestStreakProtection</string>
+    <string name="ankiquest_streak_protection_title" translatable="false" maxLength="41">Streak protection</string>
+    <string name="ankiquest_streak_protection_summary" translatable="false">Off by default. After opting in, finish all three daily quests to earn one freeze per Anki day, up to 3. One is used automatically for each ended day without reviews. Turning this off pauses earning and use; saved freezes stay.</string>
     <string name="ankiquest_avatar_key" translatable="false">ankiquestAvatar</string>
     <string name="ankiquest_avatar_title" translatable="false" maxLength="41">Profile picture</string>
     <string name="ankiquest_avatar_summary" translatable="false">Choose a picture for your profile, leaderboard and widgets</string>

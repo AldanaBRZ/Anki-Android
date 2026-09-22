@@ -15,6 +15,8 @@ package com.ichi2.anki.preferences
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.ImageView
@@ -30,6 +32,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.ichi2.anki.R
 import com.ichi2.anki.ankiquest.Ankiquest
+import com.ichi2.anki.ankiquest.AnkiquestActivity
 import com.ichi2.anki.ankiquest.AnkiquestAvatars
 import com.ichi2.anki.ankiquest.AnkiquestDeckAdapter
 import com.ichi2.anki.ankiquest.AnkiquestDeckTree
@@ -48,6 +51,7 @@ class AnkiquestSettingsFragment : SettingsFragment() {
     override val analyticsScreenNameConstant = "prefs.ankiquest"
 
     private var running = false
+    private val refreshServerSettings = mutableListOf<() -> Unit>()
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) AnkiquestPoll.refreshNow(requireContext())
@@ -81,6 +85,7 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         }
 
     override fun initSubscreen() {
+        refreshServerSettings.clear()
         requirePreference<VersatileTextPreference>(R.string.ankiquest_url_key).continuousValidator =
             VersatileTextPreference.Validator { value ->
                 if (value.isNotEmpty()) value.toHttpUrl()
@@ -93,7 +98,19 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             if (hours != "0") askForNotifications()
             true
         }
-        bindNudges()
+        bindServerToggle(
+            R.string.ankiquest_nudges_key,
+            read = { Ankiquest.nudgesEnabled() },
+            save = { Ankiquest.setNudges(it).getBoolean("nudges") },
+            notify = true,
+        )
+        bindServerToggle(
+            R.string.ankiquest_streak_protection_key,
+            read = { Ankiquest.streakProtectionEnabled() },
+            save = { Ankiquest.setStreakProtection(it) },
+        )
+        bindDashboard(R.string.ankiquest_dashboard_key)
+        bindDashboard(R.string.ankiquest_community_reminders_key, community = true)
         requirePreference<Preference>(R.string.ankiquest_avatar_key).setOnPreferenceClickListener {
             AlertDialog
                 .Builder(requireContext())
@@ -176,37 +193,111 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         }
     }
 
-    /** The nudge setting lives on the server, so the switch mirrors it instead of a preference. */
-    private fun bindNudges() {
-        val preference = requirePreference<SwitchPreferenceCompat>(R.string.ankiquest_nudges_key)
-        preference.isPersistent = false
-        preference.isEnabled = false
-        lifecycleScope.launch {
-            val current = runCatching { Ankiquest.nudgesEnabled() }.getOrNull()
-            if (current == null) {
-                preference.summary = getString(R.string.ankiquest_nudges_unavailable)
-                return@launch
-            }
-            preference.isChecked = current
-            preference.isEnabled = true
-        }
-        preference.setOnPreferenceChangeListener { _, value ->
-            val wanted = value == true
-            if (wanted) askForNotifications()
-            preference.isEnabled = false
-            lifecycleScope.launch {
-                val failure = runCatching { Ankiquest.setNudges(wanted) }.exceptionOrNull()
-                preference.isEnabled = true
-                if (failure == null) return@launch
-                preference.isChecked = !wanted
+    private fun bindDashboard(
+        key: Int,
+        community: Boolean = false,
+    ) {
+        requirePreference<Preference>(key).setOnPreferenceClickListener {
+            if (Ankiquest.dashboardUrl() == null) {
                 AlertDialog
                     .Builder(requireContext())
-                    .setTitle(preference.title)
-                    .setMessage(getString(R.string.ankiquest_check_failed, failure.message ?: failure.javaClass.simpleName))
+                    .setMessage(R.string.ankiquest_check_unconfigured)
                     .setPositiveButton(android.R.string.ok, null)
                     .show()
+            } else {
+                startActivity(
+                    Intent(requireContext(), AnkiquestActivity::class.java)
+                        .putExtra(AnkiquestActivity.COMMUNITY_REMINDERS, community),
+                )
             }
             true
+        }
+    }
+
+    /** Server switches are refreshed for the current account and change only after the server confirms. */
+    private fun bindServerToggle(
+        key: Int,
+        read: suspend () -> Boolean,
+        save: suspend (Boolean) -> Boolean,
+        notify: Boolean = false,
+    ) {
+        val preference = requirePreference<SwitchPreferenceCompat>(key)
+        val summary = preference.summary
+        var generation = 0
+        var saving = false
+        var refreshPending = false
+        preference.isPersistent = false
+        preference.isEnabled = false
+        val refresh = refresh@{
+            val request = ++generation
+            preference.isEnabled = false
+            preference.summary = getString(R.string.ankiquest_check_running)
+            // Returning to settings during a write must read the state after that write completes.
+            if (saving) {
+                refreshPending = true
+                return@refresh
+            }
+            val account = Ankiquest.webSession()
+            lifecycleScope.launch {
+                try {
+                    val enabled = read()
+                    if (request != generation || account != Ankiquest.webSession() || !isAdded) return@launch
+                    preference.isChecked = enabled
+                    preference.isEnabled = true
+                    preference.summary = summary
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (request != generation || account != Ankiquest.webSession() || !isAdded) return@launch
+                    preference.summary = getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName)
+                }
+            }
+        }
+        refreshServerSettings.add { refresh() }
+        preference.setOnPreferenceChangeListener { _, value ->
+            val wanted = value == true
+            val request = ++generation
+            val account = Ankiquest.webSession()
+            preference.isEnabled = false
+            saving = true
+            lifecycleScope.launch {
+                try {
+                    if (account != Ankiquest.webSession()) return@launch
+                    val enabled = save(wanted)
+                    if (request != generation || account != Ankiquest.webSession() || !isAdded) return@launch
+                    preference.isChecked = enabled
+                    preference.isEnabled = true
+                    if (enabled && notify) askForNotifications()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (request != generation || account != Ankiquest.webSession() || !isAdded) return@launch
+                    AlertDialog
+                        .Builder(requireContext())
+                        .setTitle(preference.title)
+                        .setMessage(getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                    refresh()
+                } finally {
+                    saving = false
+                    if (refreshPending && isAdded) {
+                        refreshPending = false
+                        refresh()
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    override fun onSharedPreferenceChanged(
+        sharedPreferences: SharedPreferences,
+        key: String?,
+    ) {
+        super.onSharedPreferenceChanged(sharedPreferences, key)
+        if (key in setOf(Ankiquest.URL_KEY, Ankiquest.USER_KEY, Ankiquest.TOKEN_KEY)) {
+            refreshServerSettings.forEach { it() }
         }
     }
 
@@ -389,6 +480,7 @@ class AnkiquestSettingsFragment : SettingsFragment() {
 
     override fun onResume() {
         super.onResume()
+        refreshServerSettings.forEach { it() }
         // Deliver pending messages promptly after returning from Android alert settings.
         AnkiquestPoll.refreshNow(requireContext())
     }
