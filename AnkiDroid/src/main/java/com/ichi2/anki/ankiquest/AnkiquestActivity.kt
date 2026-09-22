@@ -17,21 +17,29 @@ package com.ichi2.anki.ankiquest
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
-import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat.Type.displayCutout
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
 import androidx.core.view.updatePadding
+import androidx.lifecycle.lifecycleScope
 import com.ichi2.anki.AnkiActivity
 import com.ichi2.anki.R
 import com.ichi2.anki.preferences.AnkiquestSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import timber.log.Timber
+import kotlin.coroutines.resume
 
 /** Shows the ankiquest dashboard: profile, quests, achievements and the leaderboard. */
 class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
@@ -44,7 +52,8 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         }
         super.onCreate(savedInstanceState)
         val dashboard = Ankiquest.dashboardUrl()
-        if (dashboard == null) {
+        val base = dashboard?.toHttpUrlOrNull()
+        if (dashboard == null || base == null) {
             startActivity(PreferencesActivity.getIntent(this, AnkiquestSettingsFragment::class))
             finish()
             return
@@ -53,7 +62,6 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
         setTitle(R.string.ankiquest_screen_title)
         applyInsets()
 
-        val base = dashboard.toUri()
         val progress = findViewById<ProgressBar>(R.id.progress_bar)
         webView = findViewById(R.id.web_view)
         webView.settings.javaScriptEnabled = true
@@ -80,7 +88,8 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
                     view: WebView,
                     request: WebResourceRequest,
                 ): Boolean {
-                    if (request.url.host == base.host) return false
+                    val target = request.url.toString().toHttpUrlOrNull()
+                    if (target != null && target.scheme == base.scheme && target.host == base.host && target.port == base.port) return false
                     openUrl(request.url)
                     return true
                 }
@@ -94,10 +103,26 @@ class AnkiquestActivity : AnkiActivity(R.layout.activity_ankiquest) {
                     back.isEnabled = view.canGoBack()
                 }
             }
-        if (savedInstanceState == null) {
-            webView.loadUrl(dashboard)
-        } else {
-            webView.restoreState(savedInstanceState)
+        lifecycleScope.launch {
+            try {
+                Ankiquest.dashboardSession(dashboard)?.let { cookie ->
+                    withTimeoutOrNull(5_000) {
+                        suspendCancellableCoroutine<Boolean> { continuation ->
+                            CookieManager.getInstance().setCookie(dashboard, cookie) { accepted ->
+                                if (continuation.isActive) continuation.resume(accepted)
+                            }
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A public server or the website's sign-in screen can still be opened.
+                Timber.w(e, "ankiquest browser session failed")
+            }
+            if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
+                webView.loadUrl(dashboard)
+            }
         }
     }
 
