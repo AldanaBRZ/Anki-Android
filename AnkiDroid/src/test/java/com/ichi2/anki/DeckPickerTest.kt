@@ -149,6 +149,7 @@ class DeckPickerTest : RobolectricTest() {
             val deckAdapter = adapter.adapters.filterIsInstance<DeckAdapter>().single()
             val heatmapAdapter = adapter.adapters.filterIsInstance<ReviewHeatmapAdapter>().single()
 
+            advanceRobolectricLooperUntil { deckAdapter.itemCount > 0 && heatmapAdapter.itemCount == 1 }
             assertEquals(listOf(deckAdapter, heatmapAdapter), adapter.adapters)
             assertEquals(1, heatmapAdapter.itemCount)
             assertEquals(deckAdapter.itemCount + 1, adapter.itemCount)

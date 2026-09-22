@@ -899,6 +899,9 @@ open class DeckPicker :
             deckListAdapter.submit(
                 data = deckList.data,
                 hasSubDecks = deckList.hasSubDecks,
+                onListCommitted = {
+                    heatmapAdapter.onDeckListCommitted(deckListAdapter.itemCount > 0)
+                },
             )
             tryShowStudyOptionsPanel()
         }
