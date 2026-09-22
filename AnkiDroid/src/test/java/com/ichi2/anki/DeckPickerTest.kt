@@ -23,6 +23,8 @@ import androidx.core.view.ContentInfoCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.test.core.app.ActivityScenario
 import androidx.test.filters.SdkSuppress
 import anki.backend.backendError
@@ -40,6 +42,8 @@ import com.ichi2.anki.common.utils.annotation.KotlinCleanup
 import com.ichi2.anki.common.utils.ext.getParcelableExtraCompat
 import com.ichi2.anki.databinding.ActivityHomescreenBinding
 import com.ichi2.anki.deckpicker.DeckPickerViewModel
+import com.ichi2.anki.deckpicker.heatmap.ReviewHeatmapAdapter
+import com.ichi2.anki.deckpicker.heatmap.ReviewHeatmapViewModel
 import com.ichi2.anki.dialogs.DatabaseErrorDialog
 import com.ichi2.anki.dialogs.DatabaseErrorDialog.DatabaseErrorDialogType
 import com.ichi2.anki.dialogs.DeckPickerContextMenu.DeckPickerContextMenuOption
@@ -138,6 +142,58 @@ class DeckPickerTest : RobolectricTest() {
 
         assertDoesNotThrow { ChangeManager.notifySubscribers(opChanges { studyQueues = true }, null) }
     }
+
+    @Test
+    fun `review heatmap is a single footer after the deck list`() =
+        deckPicker {
+            val adapter = deckPickerBinding.decks.adapter as ConcatAdapter
+            val deckAdapter = adapter.adapters.filterIsInstance<DeckAdapter>().single()
+            val heatmapAdapter = adapter.adapters.filterIsInstance<ReviewHeatmapAdapter>().single()
+
+            assertEquals(listOf(deckAdapter, heatmapAdapter), adapter.adapters)
+            assertEquals(1, heatmapAdapter.itemCount)
+            assertEquals(deckAdapter.itemCount + 1, adapter.itemCount)
+        }
+
+    @Test
+    fun `reloading decks refreshes the review heatmap after studying`() =
+        withDeckPicker(deckCount = 1) { deckPicker ->
+            val heatmap = ViewModelProvider(deckPicker)[ReviewHeatmapViewModel::class.java]
+            // Lifecycle flow callbacks are posted onto the paused Android looper in Robolectric.
+            advanceRobolectricLooperUntil(lazyMessage = { "Initial heatmap did not load: ${heatmap.state.value}" }) {
+                heatmap.state.value is ReviewHeatmapViewModel.State.Loaded
+            }
+            val initial = assertNotNull(heatmap.state.value as? ReviewHeatmapViewModel.State.Loaded).data
+            val cardId = addBasicNote().firstCard().id
+            val reviewTime = col.backend.schedTimingToday().nextDayAt * 1000L - 1
+            col.db.execute(
+                "insert into revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) values (?, ?, -1, 3, 1, 1, 2500, 1000, 1)",
+                reviewTime,
+                cardId,
+            )
+
+            deckPicker.updateDeckList()
+
+            advanceRobolectricLooperUntil(lazyMessage = { "Deck reload did not refresh the heatmap: ${heatmap.state.value}" }) {
+                (heatmap.state.value as? ReviewHeatmapViewModel.State.Loaded)?.data?.totalReviews == initial.totalReviews + 1
+            }
+            val refreshed = assertNotNull(heatmap.state.value as? ReviewHeatmapViewModel.State.Loaded).data
+            assertEquals(1, refreshed.reviews[refreshed.today])
+            assertEquals(1, refreshed.currentStreak)
+
+            val decks = deckPicker.deckPickerBinding.decks
+            val footerPosition = checkNotNull(decks.adapter).itemCount - 1
+            val expectedTotal = deckPicker.getString(R.string.review_heatmap_total, "1")
+            decks.scrollToPosition(footerPosition)
+            advanceRobolectricLooperUntil(lazyMessage = { "The heatmap footer did not display the new review total" }) {
+                decks
+                    .findViewHolderForAdapterPosition(footerPosition)
+                    ?.itemView
+                    ?.findViewById<TextView>(R.id.review_heatmap_total)
+                    ?.text
+                    ?.toString() == expectedTotal
+            }
+        }
 
     @Test
     @SuppressLint("UseKtx")
@@ -471,7 +527,7 @@ class DeckPickerTest : RobolectricTest() {
 
     private fun DeckPicker.longPressDeck(name: String): View {
         val decks = deckPickerBinding.decks
-        val adapter = decks.adapter as DeckAdapter
+        val adapter = (decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
         val deck = adapter.currentList.single { it.lastDeckNameComponent == name }
         val position = adapter.currentList.indexOf(deck)
         decks.findViewHolderForAdapterPosition(position)!!.itemView.performLongClick()

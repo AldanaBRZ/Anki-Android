@@ -15,6 +15,7 @@
  */
 package com.ichi2.anki.widget
 
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.DeckPicker
@@ -64,7 +65,7 @@ class DeckAdapterTest : RobolectricTest() {
         col.decks.select(initiallySelected)
 
         withDeckPicker(deckCount = 0) { deckPicker ->
-            val adapter = deckPicker.deckPickerBinding.decks.adapter as DeckAdapter
+            val adapter = (deckPicker.deckPickerBinding.decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
             val pressedRow = deckPicker.deckHolder(pressedDeck).itemView
             pressedRow.isPressed = true
             val originalRipple = pressedRow.background
@@ -88,7 +89,7 @@ class DeckAdapterTest : RobolectricTest() {
         col.decks.select(parentDeck)
 
         withDeckPicker(deckCount = 0) { deckPicker ->
-            val adapter = deckPicker.deckPickerBinding.decks.adapter as DeckAdapter
+            val adapter = (deckPicker.deckPickerBinding.decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
             val parent = deckPicker.deckHolder(parentDeck)
             val changePayloads = mutableListOf<Any?>()
             adapter.observeItemRangeChanges { _, _, payload -> changePayloads.add(payload) }
@@ -114,7 +115,7 @@ class DeckAdapterTest : RobolectricTest() {
 
     private fun DeckPicker.deckHolder(deckId: DeckId): DeckAdapter.ViewHolder {
         val decks = deckPickerBinding.decks
-        val adapter = decks.adapter as DeckAdapter
+        val adapter = (decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
         val position = adapter.currentList.indexOfFirst { it.did == deckId }
         return decks.findViewHolderForAdapterPosition(position) as DeckAdapter.ViewHolder
     }
