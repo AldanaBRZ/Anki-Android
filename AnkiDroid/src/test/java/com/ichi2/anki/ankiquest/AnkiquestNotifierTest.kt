@@ -152,14 +152,19 @@ class AnkiquestNotifierTest : RobolectricTest() {
     @Test
     fun `suggested replies do not duplicate the quick cheer on incoming or failed notifications`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
+        val account = replyAccount()
         AnkiquestNotifier.onDeckCompletions(
             targetContext,
-            "server/hill",
+            account.notificationAccount,
             JSONArray().put(message(1, 30).put("sender", "cerro")),
+            account.scope,
         )
         val incoming = shadowOf(manager).getNotification(5_140_001)
         val cheer = shadowOf(incoming.actions[0].actionIntent).savedIntent
-        AnkiquestNotifier.onReplyFailed(targetContext, AnkiquestReply.data(cheer, AnkiquestReply.message(cheer)))
+        val data = AnkiquestReply.data(cheer, AnkiquestReply.message(cheer))
+        assertEquals(account.notificationAccount, data.getString(AnkiquestReply.ACCOUNT_KEY))
+        assertEquals(account.scope, data.getString(AnkiquestReply.SCOPE_KEY))
+        AnkiquestNotifier.onReplyFailed(targetContext, data)
         val failed = shadowOf(manager).getNotification(5_140_001)
 
         for (notification in listOf(incoming, failed)) {
@@ -176,7 +181,18 @@ class AnkiquestNotifierTest : RobolectricTest() {
 
     @Test
     fun `reply suggestions are limited to the choices supplied by the app`() {
-        val reply = AnkiquestReply.actions(targetContext, 1, 5_140_001, "Deck complete", "Completed Spanish").last()
+        val account = replyAccount()
+        val reply =
+            AnkiquestReply
+                .actions(
+                    targetContext,
+                    1,
+                    5_140_001,
+                    "Deck complete",
+                    "Completed Spanish",
+                    account.notificationAccount,
+                    account.scope,
+                ).last()
         assertFalse(reply.allowGeneratedReplies, "Android must not add another quick cheer suggestion")
     }
 
