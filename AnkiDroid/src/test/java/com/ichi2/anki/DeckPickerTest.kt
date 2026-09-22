@@ -527,7 +527,7 @@ class DeckPickerTest : RobolectricTest() {
     private fun DeckPicker.longPressDeck(deckId: DeckId): View {
         val decks = deckPickerBinding.decks
         val adapter = (decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
-        awaitDeckHolder(deckId).itemView.performLongClick()
+        awaitInitialDeckHolder(deckId).itemView.performLongClick()
         advanceRobolectricLooperUntil {
             viewModel.focusedDeck == deckId && adapter.currentList.any { it.did == deckId && it.isSelected }
         }
