@@ -20,7 +20,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -45,7 +47,7 @@ object AnkiquestNotifier {
 
     private const val CHANNEL = "ankiquest"
 
-    /** Its own channel because it vibrates, and a channel cannot be changed once made. */
+    /** Keep nudges independently configurable, including channels saved by older versions. */
     private const val NUDGE_CHANNEL = "ankiquestNudges"
     private val BUZZ = longArrayOf(0, 250, 150, 250)
     private const val ORDER_KEY = "ankiquestLastOrder"
@@ -63,20 +65,29 @@ object AnkiquestNotifier {
     ) {
         val prefs = AnkiDroidApp.sharedPrefs()
         val key = "ankiquestCompletionCursor:$account"
+        val firstPollKey = "ankiquestCompletionFirstPollAt:$account"
         val entries = (0 until notifications.length()).map { notifications.getJSONObject(it) }.sortedBy { it.getLong("id") }
         var previous = prefs.getLong(key, 0L)
-        val now = TimeManager.time.intTimeMS() / 1000
+        // Only discard an old backlog on first contact. Unseen messages must not
+        // age out while offline or waiting for notification permission.
+        val firstPoll =
+            if (prefs.contains(firstPollKey)) {
+                prefs.getLong(firstPollKey, 0L)
+            } else {
+                val start = if (prefs.contains(key)) 0L else TimeManager.time.intTimeMS() / 1000
+                prefs.edit { putLong(firstPollKey, start) }
+                start
+            }
         for (entry in entries) {
             val id = entry.getLong("id")
             if (id <= previous) continue
-            // Show recent completions even on the first poll, but never replay an old backlog.
-            val fresh = AnkiquestCompletionPolicy.freshNotification(entry.optLong("created_at"), now)
+            val fresh = AnkiquestCompletionPolicy.freshNotification(entry.optLong("created_at"), firstPoll)
             val tag = 5_140_000 + (id % 1_000_000).toInt()
             val title = entry.getString("title")
             val body = entry.getString("body")
             val answerable = entry.optString("sender").isNotEmpty() && !entry.optBoolean("replied")
             if (fresh &&
-                !notify(
+                notify(
                     context,
                     tag,
                     title,
@@ -84,7 +95,7 @@ object AnkiquestNotifier {
                     dashboardIntent(context),
                     if (answerable) AnkiquestReply.actions(context, id, tag, title, body) else emptyList(),
                     entry.optString("kind") == "nudge",
-                )
+                ) == Delivery.DISABLED
             ) {
                 return
             }
@@ -149,7 +160,6 @@ object AnkiquestNotifier {
         if (remaining > hours * HOUR_MS) return
         val day = sinceRollover.floorDiv(DAY_MS)
         if (prefs.getLong(STREAK_DAY_KEY, Long.MIN_VALUE) == day) return
-        prefs.edit { putLong(STREAK_DAY_KEY, day) }
 
         val streak = profile.optInt("streak")
         val left = ceil(remaining.toDouble() / HOUR_MS).toInt()
@@ -161,7 +171,9 @@ object AnkiquestNotifier {
                 "Review a few cards to keep it. No freezes left."
             }
         val open = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        notify(context, STREAK_ID, "🔥 Your $streak day streak ends in ${left}h", body, open)
+        if (notify(context, STREAK_ID, "🔥 Your $streak day streak ends in ${left}h", body, open) != Delivery.DISABLED) {
+            prefs.edit { putLong(STREAK_DAY_KEY, day) }
+        }
     }
 
     /** Replaces the answered notification with what was said, so the reply is visibly gone. */
@@ -177,6 +189,7 @@ object AnkiquestNotifier {
             data.getString(AnkiquestReply.TITLE_KEY).orEmpty(),
             context.getString(R.string.ankiquest_reply_sent, who, message),
             dashboardIntent(context),
+            silent = true,
         )
     }
 
@@ -196,11 +209,51 @@ object AnkiquestNotifier {
             context.getString(R.string.ankiquest_reply_failed, message),
             dashboardIntent(context),
             AnkiquestReply.actions(context, data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0), tag, title, body),
+            silent = true,
         )
     }
 
     private fun dashboardIntent(context: Context): Intent =
         Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Existing channel behavior belongs to Android settings, not app updates. */
+    fun alertSettingsIntent(
+        context: Context,
+        nudge: Boolean,
+    ): Intent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = ensureChannel(context, nudge)
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channel)
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+        }
+
+    private fun ensureChannel(
+        context: Context,
+        nudge: Boolean,
+    ): String {
+        val channel = if (nudge) NUDGE_CHANNEL else CHANNEL
+        val manager = NotificationManagerCompat.from(context)
+        if (manager.getNotificationChannel(channel) == null) {
+            manager.createNotificationChannel(
+                NotificationChannelCompat
+                    .Builder(channel, NotificationManagerCompat.IMPORTANCE_HIGH)
+                    .setName(context.getString(if (nudge) R.string.ankiquest_nudges_title else R.string.ankiquest_screen_title))
+                    .setVibrationEnabled(true)
+                    .setVibrationPattern(BUZZ)
+                    .build(),
+            )
+        }
+        return channel
+    }
+
+    private enum class Delivery {
+        POSTED,
+        CHANNEL_BLOCKED,
+        DISABLED,
+    }
 
     @SuppressLint("MissingPermission")
     private fun notify(
@@ -210,28 +263,20 @@ object AnkiquestNotifier {
         body: String,
         open: Intent,
         actions: List<NotificationCompat.Action> = emptyList(),
-        buzz: Boolean = false,
-    ): Boolean {
+        nudge: Boolean = false,
+        silent: Boolean = false,
+    ): Delivery {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
-            return false
+            return Delivery.DISABLED
         }
         val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return false
-        val channel = if (buzz) NUDGE_CHANNEL else CHANNEL
-        manager.createNotificationChannel(
-            NotificationChannelCompat
-                .Builder(channel, NotificationManagerCompat.IMPORTANCE_DEFAULT)
-                .setName(
-                    context.getString(
-                        if (buzz) R.string.ankiquest_nudges_title else R.string.ankiquest_screen_title,
-                    ),
-                ).setVibrationEnabled(buzz)
-                .setVibrationPattern(if (buzz) BUZZ else null)
-                .build(),
-        )
-        if (manager.getNotificationChannel(channel)?.importance == NotificationManagerCompat.IMPORTANCE_NONE) return false
+        if (!manager.areNotificationsEnabled()) return Delivery.DISABLED
+        val channel = ensureChannel(context, nudge)
+        if (manager.getNotificationChannel(channel)?.importance == NotificationManagerCompat.IMPORTANCE_NONE) {
+            return Delivery.CHANNEL_BLOCKED
+        }
         val notification =
             NotificationCompat
                 .Builder(context, channel)
@@ -240,8 +285,12 @@ object AnkiquestNotifier {
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
-                // Android 7 and older have no channels; the notification itself buzzes.
-                .setVibrate(if (buzz) BUZZ else null)
+                // Before channels, Android reads alert behavior from the notification.
+                // The system still applies the phone's ringer and Do Not Disturb settings.
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_SOUND)
+                .setVibrate(BUZZ)
+                .setSilent(silent)
                 .setContentIntent(
                     PendingIntent.getActivity(
                         context,
@@ -251,7 +300,12 @@ object AnkiquestNotifier {
                     ),
                 ).apply { actions.forEach { addAction(it) } }
                 .build()
-        manager.notify(id, notification)
-        return true
+        return try {
+            manager.notify(id, notification)
+            Delivery.POSTED
+        } catch (_: SecurityException) {
+            // Permission may be revoked after the check above. Keep the inbox pending.
+            Delivery.DISABLED
+        }
     }
 }

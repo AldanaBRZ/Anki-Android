@@ -35,6 +35,16 @@
         android:summary="@string/ankiquest_nudges_summary"
         android:title="@string/ankiquest_nudges_title" />
     <Preference
+        android:key="@string/ankiquest_message_alerts_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_message_alerts_title"
+        android:summary="@string/ankiquest_alerts_summary" />
+    <Preference
+        android:key="@string/ankiquest_nudge_alerts_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_nudge_alerts_title"
+        android:summary="@string/ankiquest_alerts_summary" />
+    <Preference
         android:key="@string/ankiquest_deck_notifications_key"
         android:title="@string/ankiquest_deck_notifications_title"
         android:summary="@string/ankiquest_deck_notifications_summary" />

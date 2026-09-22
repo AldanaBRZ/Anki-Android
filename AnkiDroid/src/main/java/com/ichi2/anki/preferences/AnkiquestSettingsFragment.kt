@@ -14,6 +14,7 @@
 package com.ichi2.anki.preferences
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,8 +31,11 @@ import com.ichi2.anki.R
 import com.ichi2.anki.ankiquest.Ankiquest
 import com.ichi2.anki.ankiquest.AnkiquestDeckAdapter
 import com.ichi2.anki.ankiquest.AnkiquestDeckTree
+import com.ichi2.anki.ankiquest.AnkiquestNotifier
+import com.ichi2.anki.ankiquest.AnkiquestPoll
 import com.ichi2.anki.ankiquest.AnkiquestUpdater
 import com.ichi2.preferences.VersatileTextPreference
+import com.ichi2.utils.Permissions.openAppSettingsScreen
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
@@ -41,7 +45,10 @@ class AnkiquestSettingsFragment : SettingsFragment() {
     override val analyticsScreenNameConstant = "prefs.ankiquest"
 
     private var running = false
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) AnkiquestPoll.refreshNow(requireContext())
+        }
 
     override fun initSubscreen() {
         requirePreference<VersatileTextPreference>(R.string.ankiquest_url_key).continuousValidator =
@@ -57,6 +64,8 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             true
         }
         bindNudges()
+        bindAlertSettings(R.string.ankiquest_message_alerts_key, nudge = false)
+        bindAlertSettings(R.string.ankiquest_nudge_alerts_key, nudge = true)
         bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
         bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
         bindAction(R.string.ankiquest_deck_notifications_key) {
@@ -73,6 +82,20 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 AnkiquestUpdater.installed() ?: getString(R.string.ankiquest_local_build),
             )
         bindAction(R.string.ankiquest_check_updates_key) { AnkiquestUpdater.checkNow(requireActivity()) }
+    }
+
+    private fun bindAlertSettings(
+        key: Int,
+        nudge: Boolean,
+    ) {
+        requirePreference<Preference>(key).setOnPreferenceClickListener {
+            try {
+                startActivity(AnkiquestNotifier.alertSettingsIntent(requireContext(), nudge))
+            } catch (_: ActivityNotFoundException) {
+                openAppSettingsScreen()
+            }
+            true
+        }
     }
 
     /** The nudge setting lives on the server, so the switch mirrors it instead of a preference. */
@@ -284,6 +307,12 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
         if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Deliver pending messages promptly after returning from Android alert settings.
+        AnkiquestPoll.refreshNow(requireContext())
     }
 
     companion object {
