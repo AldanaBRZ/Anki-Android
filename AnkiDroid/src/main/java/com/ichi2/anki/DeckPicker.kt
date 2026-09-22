@@ -1227,7 +1227,7 @@ open class DeckPicker :
         menuInflater.inflate(R.menu.deck_picker, menu)
         if (AnkiquestNavigation.enabled() && !fragmented) {
             menu.findItem(R.id.action_ankiquest)?.apply {
-                setTitle(R.string.ankiquest_browse_cards)
+                setTitle(R.string.browse_cards)
                 setIcon(R.drawable.ic_flashcard_black)
                 setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
             }
@@ -1551,7 +1551,7 @@ open class DeckPicker :
                                     summary.duration(this@DeckPicker),
                                     summary.remaining,
                                 ),
-                            ).setNegativeButton(R.string.ankiquest_summary_done, null)
+                            ).setNegativeButton(R.string.multimedia_editor_field_editing_done, null)
                             .setNeutralButton(R.string.ankiquest_summary_progress) { _, _ ->
                                 startActivity(AnkiquestHomeActivity.intent(this@DeckPicker, "progress"))
                             }

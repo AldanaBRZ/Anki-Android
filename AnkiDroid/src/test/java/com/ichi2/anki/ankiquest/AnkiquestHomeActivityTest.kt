@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.allViews
+import androidx.core.view.size
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.ichi2.anki.DeckPicker
@@ -86,7 +87,7 @@ class AnkiquestHomeActivityTest : RobolectricTest() {
             )
         val home = launch()
         val nav = home.findViewById<BottomNavigationView>(R.id.aq_home_navigation)
-        assertEquals(4, nav.menu.size())
+        assertEquals(4, nav.menu.size)
         assertEquals(R.id.ankiquest_nav_today, nav.selectedItemId)
         assertTrue(home.hasText("Spanish"))
         home.click(home.getString(R.string.aq_home_study_due, 24))

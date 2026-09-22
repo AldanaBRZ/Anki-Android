@@ -23,6 +23,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.core.widget.NestedScrollView
+import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
@@ -86,7 +87,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         scroll = findViewById(R.id.aq_home_scroll)
         activityButton = findViewById(R.id.aq_home_activity)
         activityButton.setTextColor(getColor(R.color.aq_home_text))
-        activityButton.compoundDrawableTintList = ColorStateList.valueOf(getColor(R.color.aq_home_text))
+        TextViewCompat.setCompoundDrawableTintList(activityButton, ColorStateList.valueOf(getColor(R.color.aq_home_text)))
         activityButton.setOnClickListener { showTab("activity") }
         findViewById<BottomNavigationView>(R.id.aq_home_navigation).setOnItemSelectedListener { item ->
             showTab(

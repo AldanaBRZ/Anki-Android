@@ -8,7 +8,6 @@
     <color name="aq_home_primary_text">#FFFFFF</color>
     <color name="aq_home_tint">#EAF2FF</color>
     <color name="aq_home_outline">#DCE4E7</color>
-    <color name="aq_home_success">#267354</color>
     <string name="aq_home_activity">Activity</string>
     <string name="aq_home_activity_unread">Activity · %1$d unread</string>
     <string name="aq_home_settings">Account and preferences</string>
@@ -51,7 +50,6 @@
     <string name="aq_home_shared_rule">Contributions add toward one shared total. There is no individual quota.</string>
     <string name="aq_home_personal_rule">Each participating person works toward the same personal target.</string>
     <string name="aq_home_member_progress">%1$s · %2$d</string>
-    <string name="aq_home_member_waiting">%1$s · invitation pending</string>
     <string name="aq_home_member_left">%1$s · no longer participating</string>
     <string name="aq_home_accept">Accept</string>
     <string name="aq_home_decline">Decline</string>
@@ -101,5 +99,5 @@
     <string name="aq_home_account_route_changed">This notification belongs to a different account. Showing this account’s Activity instead.</string>
     <string name="aq_home_last_session">Your last study session</string>
     <string name="aq_home_session_summary">%1$d reviews · %2$s · %3$d ready at session end</string>
-    <string name="aq_home_back">Back</string>
+    <string name="aq_home_back" maxLength="28" comment="Navigation to the previous AnkiQuest screen, distinct from the card answer-side field and the configurable previewer control.">Back</string>
 </resources>

@@ -5,6 +5,7 @@ package com.ichi2.anki.ankiquest
 import android.content.SharedPreferences
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.CollectionManager
+import com.ichi2.anki.common.time.TimeManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -100,7 +101,7 @@ internal data class HomeChallenge(
 ) {
     fun membership(user: String): String? = members.firstOrNull { it.user == user }?.status
 
-    fun open(now: Long = System.currentTimeMillis()): Boolean = endAt > now && status !in setOf("cancelled", "ended")
+    fun open(now: Long = TimeManager.time.intTimeMS()): Boolean = endAt > now && status !in setOf("cancelled", "ended")
 
     fun priority(user: String): Int =
         when {
@@ -332,7 +333,7 @@ internal class HomeRepository(
                 async<HomeSection<HomeInbox>> {
                     if (account.token.isEmpty()) HomeSection(failure = HomeFailure.AUTH) else section(old?.inbox) { inbox(account) }
                 }
-            val result = HomeRemote(account.scope, profile.await(), challenges.await(), inbox.await(), System.currentTimeMillis())
+            val result = HomeRemote(account.scope, profile.await(), challenges.await(), inbox.await(), TimeManager.time.intTimeMS())
             ensureCurrent(account)
             val invalidToken =
                 account.token.isNotEmpty() &&

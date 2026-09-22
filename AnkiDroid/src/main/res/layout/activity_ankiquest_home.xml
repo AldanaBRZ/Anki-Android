@@ -40,7 +40,7 @@
             android:padding="12dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_settings_black"
-            android:tint="@color/aq_home_text"
+            app:tint="@color/aq_home_text"
             android:contentDescription="@string/aq_home_settings" />
     </LinearLayout>
     <ProgressBar

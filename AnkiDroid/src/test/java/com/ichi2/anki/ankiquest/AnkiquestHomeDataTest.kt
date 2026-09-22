@@ -2,6 +2,7 @@
 
 package com.ichi2.anki.ankiquest
 
+import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.EmptyApplicationCategory
@@ -233,6 +234,8 @@ class AnkiquestHomeDataTest : RobolectricTest() {
     }
 
     @Test
+    // Synthetic credentials on a reserved example domain verify that URL userinfo is rejected.
+    @SuppressLint("AuthLeak")
     fun `blank and ambiguous server URLs cannot carry credentials`() {
         fun settings(url: String) = mapOf(Ankiquest.URL_KEY to url, Ankiquest.USER_KEY to "member", Ankiquest.TOKEN_KEY to "secret")
         listOf(
