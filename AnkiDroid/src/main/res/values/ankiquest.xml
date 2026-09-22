@@ -25,7 +25,6 @@
     <string name="ankiquest_reply_sent" translatable="false">Sent to %1$s: %2$s</string>
     <string name="ankiquest_reply_failed" translatable="false">Could not send \u201c%1$s\u201d. Tap a button to try again.</string>
     <string-array name="ankiquest_reply_choices" translatable="false">
-        <item>Good job!</item>
         <item>Nice one \ud83d\udd25</item>
         <item>Keep it up!</item>
     </string-array>

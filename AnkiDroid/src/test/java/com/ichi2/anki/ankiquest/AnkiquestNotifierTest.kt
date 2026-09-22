@@ -137,6 +137,37 @@ class AnkiquestNotifierTest : RobolectricTest() {
     }
 
     @Test
+    fun `suggested replies do not duplicate the quick cheer on incoming or failed notifications`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        AnkiquestNotifier.onDeckCompletions(
+            targetContext,
+            "server/hill",
+            JSONArray().put(message(1, 30).put("sender", "cerro")),
+        )
+        val incoming = shadowOf(manager).getNotification(5_140_001)
+        val cheer = shadowOf(incoming.actions[0].actionIntent).savedIntent
+        AnkiquestNotifier.onReplyFailed(targetContext, AnkiquestReply.data(cheer, AnkiquestReply.message(cheer)))
+        val failed = shadowOf(manager).getNotification(5_140_001)
+
+        for (notification in listOf(incoming, failed)) {
+            val reply = notification.actions.single { it.remoteInputs?.isNotEmpty() == true }
+            val input = reply.remoteInputs.single()
+            val choices = input.choices.map { it.toString() }
+            val labels = notification.actions.map { it.title.toString() } + choices
+            assertEquals(1, labels.count { it == "Good job!" }, "offer the quick cheer only once")
+            assertEquals(listOf("Nice one \uD83D\uDD25", "Keep it up!"), choices)
+            assertTrue(input.allowFreeFormInput, "custom replies remain available")
+            assertFalse(reply.allowGeneratedReplies, "Android must not add another quick cheer suggestion")
+        }
+    }
+
+    @Test
+    fun `reply suggestions are limited to the choices supplied by the app`() {
+        val reply = AnkiquestReply.actions(targetContext, 1, 5_140_001, "Deck complete", "Completed Spanish").last()
+        assertFalse(reply.allowGeneratedReplies, "Android must not add another quick cheer suggestion")
+    }
+
+    @Test
     fun `a sent reply replaces the buttons and a failed one keeps them`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         val data =
