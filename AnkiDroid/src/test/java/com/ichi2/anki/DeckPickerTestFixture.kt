@@ -4,8 +4,12 @@ package com.ichi2.anki
 
 import android.content.Intent
 import androidx.core.content.edit
+import androidx.recyclerview.widget.ConcatAdapter
 import com.ichi2.anki.RobolectricTest.Companion.advanceRobolectricLooper
+import com.ichi2.anki.RobolectricTest.Companion.advanceRobolectricLooperUntil
 import com.ichi2.anki.common.preferences.sharedPrefs
+import com.ichi2.anki.libanki.DeckId
+import com.ichi2.anki.widgets.DeckAdapter
 import com.ichi2.testutils.BackupManagerTestUtilities
 
 // TODO: move to testFixtures once RobolectricTest is moved
@@ -32,4 +36,23 @@ fun withDeckPicker(
             advanceRobolectricLooper() // may be a fix for flaky tests
         }
     block(deckPicker)
+}
+
+/** Waits for a requested deck's real row without scrolling or rebinding it. */
+fun DeckPicker.awaitDeckHolder(deckId: DeckId): DeckAdapter.ViewHolder {
+    val decks = deckPickerBinding.decks
+    val adapter = (decks.adapter as ConcatAdapter).adapters.filterIsInstance<DeckAdapter>().single()
+    var holder: DeckAdapter.ViewHolder? = null
+    // Draining the main looper once can finish before the background list diff posts its layout.
+    advanceRobolectricLooperUntil(lazyMessage = { "Deck $deckId was not laid out" }) {
+        val position = adapter.currentList.indexOfFirst { it.did == deckId }
+        holder =
+            if (position >= 0 && !decks.hasPendingAdapterUpdates()) {
+                decks.findViewHolderForAdapterPosition(position) as? DeckAdapter.ViewHolder
+            } else {
+                null
+            }
+        holder != null
+    }
+    return checkNotNull(holder)
 }
