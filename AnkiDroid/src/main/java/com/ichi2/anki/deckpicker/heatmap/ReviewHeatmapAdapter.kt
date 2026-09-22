@@ -13,13 +13,26 @@ class ReviewHeatmapAdapter(
 ) : RecyclerView.Adapter<ReviewHeatmapAdapter.Holder>() {
     private var data: ReviewHeatmapData? = null
     private var failed = false
+    private var shown = false
     private val viewState = ReviewHeatmapView.State()
+
+    init {
+        // An early footer must not consume the deck list's initial or restored scroll position.
+        stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
+    }
 
     class Holder(
         val heatmap: ReviewHeatmapView,
     ) : RecyclerView.ViewHolder(heatmap)
 
-    override fun getItemCount(): Int = 1
+    override fun getItemCount(): Int = if (shown) 1 else 0
+
+    /** Keep the footer behind committed deck rows, including when a filter is cleared. */
+    fun onDeckListCommitted(hasDecks: Boolean) {
+        if (shown == hasDecks) return
+        shown = hasDecks
+        if (shown) notifyItemInserted(0) else notifyItemRemoved(0)
+    }
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -48,18 +61,18 @@ class ReviewHeatmapAdapter(
     fun setData(data: ReviewHeatmapData) {
         this.data = data
         failed = false
-        notifyItemChanged(0)
+        if (shown) notifyItemChanged(0)
     }
 
     fun setLoading() {
         data = null
         failed = false
-        notifyItemChanged(0)
+        if (shown) notifyItemChanged(0)
     }
 
     fun setError() {
         data = null
         failed = true
-        notifyItemChanged(0)
+        if (shown) notifyItemChanged(0)
     }
 }

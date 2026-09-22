@@ -142,11 +142,18 @@ class ReviewHeatmapViewTest {
         val today = LocalDate.of(2024, 6, 1)
         val adapter = ReviewHeatmapAdapter({ _, _ -> }, {})
         adapter.setData(ReviewHeatmap.summarize(today, mapOf(today.minusYears(1) to 5), emptyMap()))
+        adapter.onDeckListCommitted(hasDecks = true)
         val parent = FrameLayout(context)
         val first = adapter.onCreateViewHolder(parent, 0)
         adapter.onBindViewHolder(first, 0)
         first.heatmap.findViewById<View>(R.id.review_heatmap_previous_year).performClick()
         first.heatmap.findViewById<View>(R.id.review_heatmap_collapse).performClick()
+        // A filter with no deck matches hides the footer without losing its chosen year or state.
+        adapter.onDeckListCommitted(hasDecks = false)
+        assertEquals(0, adapter.itemCount)
+        adapter.setLoading()
+        adapter.setData(ReviewHeatmap.summarize(today, mapOf(today.minusYears(1) to 5), emptyMap()))
+        adapter.onDeckListCommitted(hasDecks = true)
         val recycled = adapter.onCreateViewHolder(parent, 0)
         adapter.onBindViewHolder(recycled, 0)
 
