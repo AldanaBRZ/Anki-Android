@@ -3,10 +3,13 @@ package com.ichi2.anki.ankiquest
 
 import android.content.ComponentName
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.RobolectricTest
+import io.mockk.every
+import io.mockk.mockk
 import org.json.JSONObject
 import org.junit.Before
 import org.junit.Test
@@ -44,6 +47,30 @@ class AnkiquestMobileNavigationTest : RobolectricTest() {
         val before = AnkiquestNavigation.accountFingerprint()
         assertFalse(before.contains("member-token"))
         AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.TOKEN_KEY, "replacement-token") }
+        assertNotEquals(before, AnkiquestNavigation.accountFingerprint())
+    }
+
+    @Test
+    fun `presentation identity captures fallback member in the same settings snapshot`() {
+        val preferences = AnkiDroidApp.sharedPrefs()
+        preferences.edit {
+            remove(Ankiquest.USER_KEY)
+            putString("username", "original-member")
+        }
+        val before = AnkiquestNavigation.accountFingerprint()
+        val changingPreferences = mockk<SharedPreferences>()
+        every { changingPreferences.all } answers {
+            val snapshot = preferences.all
+            preferences.edit { putString("username", "different-member") }
+            snapshot
+        }
+        val previousOverride = AnkiDroidApp.sharedPreferencesTestingOverride
+        try {
+            AnkiDroidApp.sharedPreferencesTestingOverride = changingPreferences
+            assertEquals(before, AnkiquestNavigation.accountFingerprint())
+        } finally {
+            AnkiDroidApp.sharedPreferencesTestingOverride = previousOverride
+        }
         assertNotEquals(before, AnkiquestNavigation.accountFingerprint())
     }
 

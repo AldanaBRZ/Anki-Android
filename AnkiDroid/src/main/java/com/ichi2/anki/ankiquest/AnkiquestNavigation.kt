@@ -23,11 +23,15 @@ object AnkiquestNavigation {
     /** A credential change invalidates private presentation state, including a same-user token change. */
     fun accountFingerprint(): String {
         val settings = AnkiDroidApp.sharedPrefs().all
+        val player =
+            (settings[Ankiquest.USER_KEY] as? String).orEmpty().trim().ifEmpty {
+                (settings["username"] as? String).orEmpty().trim()
+            }
         val identity =
             listOf(
                 settings[Ankiquest.URL_KEY].toString(),
                 settings[Ankiquest.USER_KEY].toString(),
-                Ankiquest.player().orEmpty(),
+                player,
                 settings[Ankiquest.TOKEN_KEY].toString(),
             ).joinToString("\u0000")
         return MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }

@@ -5,7 +5,6 @@ package com.ichi2.anki.ankiquest
 import android.content.SharedPreferences
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.CollectionManager
-import com.ichi2.anki.settings.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -38,6 +37,8 @@ internal data class HomeAccount(
             .joinToString("") { "%02x".format(it) }
 
     fun url(path: String): HttpUrl = requireNotNull("$server/$path".toHttpUrlOrNull())
+
+    override fun toString(): String = "HomeAccount(server=$server, user=$user)"
 
     companion object {
         fun from(
@@ -406,8 +407,10 @@ internal class HomeRepository(
 }
 
 internal object AnkiquestHomeData {
-    fun account(preferences: SharedPreferences = AnkiDroidApp.sharedPrefs()): HomeAccount? =
-        HomeAccount.from(preferences.all, Prefs.username.orEmpty())
+    fun account(preferences: SharedPreferences = AnkiDroidApp.sharedPrefs()): HomeAccount? {
+        val settings = preferences.all
+        return HomeAccount.from(settings, (settings["username"] as? String).orEmpty())
+    }
 
     val repository = HomeRepository({ account() })
 

@@ -2,11 +2,16 @@
 
 package com.ichi2.anki.ankiquest
 
+import android.content.SharedPreferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.EmptyApplicationCategory
 import com.ichi2.anki.RobolectricTest
 import com.ichi2.testutils.EmptyApplication
 import com.sun.net.httpserver.HttpServer
+import io.mockk.confirmVerified
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -187,6 +192,7 @@ class AnkiquestHomeDataTest : RobolectricTest() {
 
     @Test
     fun `scope changes for server member and credential and discards cache`() {
+        assertFalse(account.toString().contains(account.token))
         val cache = HomeCache()
         val snapshot = HomeRemote(account.scope, HomeSection(JSONObject()), HomeSection(), HomeSection(), 1)
         cache.select(account)
@@ -199,6 +205,31 @@ class AnkiquestHomeDataTest : RobolectricTest() {
             assertNull(cache.select(it))
         }
         assertNull(cache.select(null))
+    }
+
+    @Test
+    fun `fallback member and credentials are captured from one preferences snapshot`() {
+        val first =
+            mapOf(
+                Ankiquest.URL_KEY to "https://first.example",
+                Ankiquest.USER_KEY to " ",
+                Ankiquest.TOKEN_KEY to "first-token",
+                "username" to "first member",
+            )
+        val second =
+            mapOf(
+                Ankiquest.URL_KEY to "https://second.example",
+                Ankiquest.USER_KEY to "",
+                Ankiquest.TOKEN_KEY to "second-token",
+                "username" to "second member",
+            )
+        val preferences = mockk<SharedPreferences>()
+        every { preferences.all } returnsMany listOf(first, second)
+
+        assertEquals(HomeAccount("https://first.example", "first member", "first-token"), AnkiquestHomeData.account(preferences))
+        assertEquals(HomeAccount("https://second.example", "second member", "second-token"), AnkiquestHomeData.account(preferences))
+        verify(exactly = 2) { preferences.all }
+        confirmVerified(preferences)
     }
 
     @Test
