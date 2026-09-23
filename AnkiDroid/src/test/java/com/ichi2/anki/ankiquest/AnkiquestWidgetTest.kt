@@ -22,6 +22,7 @@ import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.common.time.TimeManager
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Test
@@ -250,6 +251,7 @@ class AnkiquestWidgetTest : RobolectricTest() {
             putString(Ankiquest.TOKEN_KEY, "member-token")
             putBoolean(AnkiquestNavigation.OPEN_TODAY_KEY, true)
         }
+        Ankiquest.resumeUploadAt = TimeManager.time.intTimeMS()
         assertTrue(AnkiquestNavigation.enabled())
     }
 

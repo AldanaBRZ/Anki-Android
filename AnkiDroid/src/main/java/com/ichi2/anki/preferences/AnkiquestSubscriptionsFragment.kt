@@ -164,15 +164,18 @@ class AnkiquestSubscriptionsFragment : SettingsFragment() {
         findPreference<Preference>(STATUS_KEY)!!.apply {
             summary =
                 message
-                    ?: getString(
-                        if (current?.senders?.isEmpty() ==
-                            true
-                        ) {
-                            R.string.ankiquest_subscriptions_empty
-                        } else {
-                            R.string.ankiquest_subscriptions_scope
-                        },
-                    )
+                    ?: listOfNotNull(
+                        getString(
+                            if (current?.senders?.isEmpty() ==
+                                true
+                            ) {
+                                R.string.ankiquest_subscriptions_empty
+                            } else {
+                                R.string.ankiquest_subscriptions_scope
+                            },
+                        ),
+                        getString(R.string.ankiquest_subscriptions_legacy).takeIf { current?.legacyMutes == true },
+                    ).joinToString("\n\n")
         }
         findPreference<Preference>(RETRY_KEY)!!.isVisible = canRetry && !busy
         findPreference<PreferenceCategory>(PEOPLE_KEY)!!.apply {

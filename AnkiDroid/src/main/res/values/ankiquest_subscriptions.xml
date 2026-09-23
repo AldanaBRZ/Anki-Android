@@ -22,4 +22,5 @@
     <string name="ankiquest_subscriptions_error">Could not confirm your notification choices. Check your connection and try again before making another change.</string>
     <string name="ankiquest_subscriptions_empty">Nobody is sharing deck completions with you yet, and you have no saved unsubscribes. You can still turn all deck completion notifications on or off.</string>
     <string name="ankiquest_subscriptions_retry" maxLength="41">Reload choices</string>
+    <string name="ankiquest_subscriptions_legacy">People you muted before are shown as unsubscribed. Saving any change here, including the switch above, also removes you from their sharing lists.</string>
 </resources>

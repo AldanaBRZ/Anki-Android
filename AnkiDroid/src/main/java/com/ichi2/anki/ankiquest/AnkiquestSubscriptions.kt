@@ -26,6 +26,7 @@ internal data class IncomingSubscriptions(
     val enabled: Boolean,
     val unsubscribedSenders: Set<String>,
     val senders: List<IncomingSender>,
+    val legacyMutes: Boolean = false,
 ) {
     companion object {
         fun parse(json: JSONObject): IncomingSubscriptions {
@@ -47,6 +48,7 @@ internal data class IncomingSubscriptions(
                     .filter { it.user in visible }
                     .distinctBy { it.user }
                     .sortedWith(compareBy<IncomingSender> { it.display.lowercase(java.util.Locale.ROOT) }.thenBy { it.user }),
+                strings("muted_senders").isNotEmpty(),
             )
         }
     }

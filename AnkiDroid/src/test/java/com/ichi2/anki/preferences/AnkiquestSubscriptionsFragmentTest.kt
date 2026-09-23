@@ -179,6 +179,25 @@ class AnkiquestSubscriptionsFragmentTest : RobolectricTest() {
     }
 
     @Test
+    fun `previous mutes are called out before a save turns them into unsubscribes`() {
+        val fragment = open().second
+        assertFalse(
+            fragment
+                .status()
+                .summary
+                .toString()
+                .contains(targetContext.getString(R.string.ankiquest_subscriptions_legacy)),
+        )
+        coEvery { repository.load(any()) } returns original.copy(legacyMutes = true)
+        val muted = open().second
+        assertEquals(
+            targetContext.getString(R.string.ankiquest_subscriptions_scope) + "\n\n" +
+                targetContext.getString(R.string.ankiquest_subscriptions_legacy),
+            muted.status().summary.toString(),
+        )
+    }
+
+    @Test
     fun `empty subscriptions keep the global switch available`() {
         coEvery { repository.load(any()) } returns IncomingSubscriptions(true, emptySet(), emptyList())
         val fragment = open().second
