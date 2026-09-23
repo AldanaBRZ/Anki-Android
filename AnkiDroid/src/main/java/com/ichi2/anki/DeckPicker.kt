@@ -65,6 +65,7 @@ import androidx.fragment.app.commitNow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.WorkInfo
@@ -100,6 +101,7 @@ import com.ichi2.anki.common.android.animationDisabled
 import com.ichi2.anki.common.android.appContext
 import com.ichi2.anki.common.annotations.NeedsTest
 import com.ichi2.anki.common.crashreporting.CrashReportService
+import com.ichi2.anki.common.destinations.BrowserDestination
 import com.ichi2.anki.common.destinations.ChangelogDestination
 import com.ichi2.anki.common.destinations.DeferredNavigation
 import com.ichi2.anki.common.destinations.PreferencesDestination
@@ -127,6 +129,9 @@ import com.ichi2.anki.deckpicker.EmptyCardsResult
 import com.ichi2.anki.deckpicker.OptionsMenuState
 import com.ichi2.anki.deckpicker.ShortcutData
 import com.ichi2.anki.deckpicker.SyncIconState
+import com.ichi2.anki.deckpicker.heatmap.ReviewHeatmap
+import com.ichi2.anki.deckpicker.heatmap.ReviewHeatmapAdapter
+import com.ichi2.anki.deckpicker.heatmap.ReviewHeatmapViewModel
 import com.ichi2.anki.dialogs.AsyncDialogFragment
 import com.ichi2.anki.dialogs.BackupPromptDialog
 import com.ichi2.anki.dialogs.CreateDeckDialog
@@ -268,6 +273,8 @@ open class DeckPicker :
     CollectionPermissionScreenLauncher {
     val viewModel: DeckPickerViewModel by viewModels()
 
+    private val heatmapViewModel: ReviewHeatmapViewModel by viewModels()
+
     private val importViewModel: ImportViewModel by viewModels()
 
     internal lateinit var binding: ActivityHomescreenBinding
@@ -289,6 +296,7 @@ open class DeckPicker :
 
     private lateinit var decksLayoutManager: LinearLayoutManager
     private lateinit var deckListAdapter: DeckAdapter
+    private lateinit var heatmapAdapter: ReviewHeatmapAdapter
     private lateinit var pullToSyncWrapper: SwipeRefreshLayout
 
     @VisibleForTesting
@@ -569,7 +577,21 @@ open class DeckPicker :
                     Timber.d("Right Click on deck recorded!! %d, %f %f", deckId, x, y)
                 },
             )
-        deckPickerBinding.decks.adapter = deckListAdapter
+        heatmapAdapter =
+            ReviewHeatmapAdapter(
+                onDaySelected = { _, date ->
+                    launchCatchingTask {
+                        // Recalculate the relative search day in case midnight/rollover passed
+                        // while the deck list remained on screen.
+                        val query = withCol { ReviewHeatmap.searchForDay(this, date) }
+                        if (query != null) {
+                            navigate(BrowserDestination.Search(query, allDecks = true))
+                        }
+                    }
+                },
+                onRetry = { heatmapViewModel.refresh() },
+            )
+        deckPickerBinding.decks.adapter = ConcatAdapter(deckListAdapter, heatmapAdapter)
         if (Prefs.devBottomNavEnabled) {
             deckPickerBinding.decks.addItemDecoration(
                 DeckHierarchyLinesDecoration(this, deckListAdapter),
@@ -872,6 +894,9 @@ open class DeckPicker :
             deckListAdapter.submit(
                 data = deckList.data,
                 hasSubDecks = deckList.hasSubDecks,
+                onListCommitted = {
+                    heatmapAdapter.onDeckListCommitted(deckListAdapter.itemCount > 0)
+                },
             )
             tryShowStudyOptionsPanel()
         }
@@ -892,6 +917,7 @@ open class DeckPicker :
 
         fun onDecksReloaded(param: Unit) {
             hideProgressBar()
+            heatmapViewModel.refresh()
         }
 
         fun onStartupResponse(response: StartupResponse) {
@@ -953,6 +979,13 @@ open class DeckPicker :
         viewModel.flowOfFocusedDeck.launchCollectionInLifecycleScope(::onFocusedDeckChanged)
         viewModel.flowOfResizingDividerVisible.launchCollectionInLifecycleScope(::onResizingDividerVisibilityChanged)
         viewModel.flowOfDecksReloaded.launchCollectionInLifecycleScope(::onDecksReloaded)
+        heatmapViewModel.state.launchCollectionInLifecycleScope { state ->
+            when (state) {
+                ReviewHeatmapViewModel.State.Loading -> heatmapAdapter.setLoading()
+                is ReviewHeatmapViewModel.State.Loaded -> heatmapAdapter.setData(state.data)
+                ReviewHeatmapViewModel.State.Error -> heatmapAdapter.setError()
+            }
+        }
         viewModel.flowOfStartupResponse.filterNotNull().launchCollectionInLifecycleScope(::onStartupResponse)
         viewModel.flowOfShowContextMenu.launchCollectionInLifecycleScope(::showDeckPickerContextMenu)
         viewModel.flowOfShowRightClickContextMenu.launchCollectionInLifecycleScope(::showDeckPickerRightClickContextMenu)
