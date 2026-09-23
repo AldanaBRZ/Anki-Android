@@ -57,12 +57,17 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             if (granted) AnkiquestPoll.refreshNow(requireContext())
         }
 
+    // Deliberately memory-only: a restored picker result is discarded after process recreation.
+    private var pictureAccount: AnkiquestAvatars.Account? = null
     private val profilePicture =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            if (uri == null) return@registerForActivityResult
+            val account = pictureAccount
+            pictureAccount = null
+            if (uri == null || account == null) return@registerForActivityResult
             pictureAction {
-                val account = checkNotNull(AnkiquestAvatars.account()) { getString(R.string.ankiquest_nudges_unavailable) }
+                AnkiquestAvatars.requireCurrent(account)
                 val bitmap = AnkiquestAvatars.prepare(requireContext(), uri)
+                AnkiquestAvatars.requireCurrent(account)
                 val preview =
                     ImageView(requireContext()).apply {
                         setImageBitmap(bitmap)
@@ -112,27 +117,39 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         bindDashboard(R.string.ankiquest_dashboard_key)
         bindDashboard(R.string.ankiquest_community_reminders_key, community = true)
         requirePreference<Preference>(R.string.ankiquest_avatar_key).setOnPreferenceClickListener {
-            AlertDialog
-                .Builder(requireContext())
-                .setTitle(R.string.ankiquest_avatar_title)
-                .setItems(arrayOf(getString(R.string.ankiquest_avatar_choose), getString(R.string.ankiquest_avatar_remove))) { _, option ->
-                    if (option == 0) {
-                        pictureAction { profilePicture.launch("image/*") }
-                    } else {
-                        AlertDialog
-                            .Builder(requireContext())
-                            .setMessage(R.string.ankiquest_avatar_remove_confirm)
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .setPositiveButton(R.string.ankiquest_avatar_remove) { _, _ ->
-                                pictureAction {
-                                    val account =
-                                        checkNotNull(AnkiquestAvatars.account()) { getString(R.string.ankiquest_nudges_unavailable) }
-                                    AnkiquestAvatars.remove(account)
-                                    AnkiquestPoll.refreshNow(requireContext())
+            pictureAction {
+                val account = checkNotNull(AnkiquestAvatars.account()) { getString(R.string.ankiquest_nudges_unavailable) }
+                AlertDialog
+                    .Builder(requireContext())
+                    .setTitle(R.string.ankiquest_avatar_title)
+                    .setItems(
+                        arrayOf(getString(R.string.ankiquest_avatar_choose), getString(R.string.ankiquest_avatar_remove)),
+                    ) { _, option ->
+                        if (option == 0) {
+                            pictureAction {
+                                AnkiquestAvatars.requireCurrent(account)
+                                pictureAccount = account
+                                try {
+                                    profilePicture.launch("image/*")
+                                } catch (e: Exception) {
+                                    pictureAccount = null
+                                    throw e
                                 }
-                            }.show()
-                    }
-                }.show()
+                            }
+                        } else {
+                            AlertDialog
+                                .Builder(requireContext())
+                                .setMessage(R.string.ankiquest_avatar_remove_confirm)
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .setPositiveButton(R.string.ankiquest_avatar_remove) { _, _ ->
+                                    pictureAction {
+                                        AnkiquestAvatars.remove(account)
+                                        AnkiquestPoll.refreshNow(requireContext())
+                                    }
+                                }.show()
+                        }
+                    }.show()
+            }
             true
         }
         bindAlertSettings(R.string.ankiquest_message_alerts_key, nudge = false)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package com.ichi2.anki
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +19,8 @@ import androidx.fragment.app.commit
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.ichi2.anki.BottomNavController.NavigationItem
+import com.ichi2.anki.ankiquest.AnkiquestHomeActivity
+import com.ichi2.anki.ankiquest.AnkiquestNavigation
 import com.ichi2.anki.browser.CardBrowserFragment
 import com.ichi2.anki.browser.CardBrowserViewModel
 import com.ichi2.anki.common.annotations.NeedsTest
@@ -37,12 +40,45 @@ fun setupBottomNavigation() {
     if (deckPicker.supportFragmentManager.findFragmentByTag(NavigationItem.BROWSER.tag) != null) {
         ensureBrowserViewModel()
     }
-    if (!Prefs.devBottomNavEnabled || deckPicker.fragmented) return
+    if ((!Prefs.devBottomNavEnabled && !AnkiquestNavigation.enabled()) || deckPicker.fragmented) return
 
     val bottomNav = deckPicker.findViewById<BottomNavigationView>(R.id.bottom_navigation)
     val fragmentContainer = deckPicker.findViewById<View>(R.id.bottom_nav_fragment_container)
     val contentWrapper = deckPicker.findViewById<View>(R.id.deck_picker_content_wrapper)
     bottomNav.isVisible = true
+
+    if (AnkiquestNavigation.enabled()) {
+        // The deck library is the fourth destination of the same mobile shell.
+        // Card browsing and all existing library tools remain native.
+        fragmentContainer.isVisible = false
+        deckPicker.supportFragmentManager.commit { hideBottomNavFragments() }
+        contentWrapper.isVisible = true
+        bottomNav.menu.clear()
+        bottomNav.inflateMenu(R.menu.ankiquest_navigation)
+        bottomNav.selectedItemId = R.id.ankiquest_nav_decks
+        ViewCompat.setOnApplyWindowInsetsListener(bottomNav) { view, insets ->
+            view.updatePadding(bottom = insets.getInsets(navigationBars()).bottom)
+            insets
+        }
+        bottomNav.setOnItemSelectedListener { item ->
+            val tab =
+                when (item.itemId) {
+                    R.id.ankiquest_nav_today -> "today"
+                    R.id.ankiquest_nav_friends -> "friends"
+                    R.id.ankiquest_nav_progress -> "progress"
+                    else -> null
+                }
+            if (tab != null) {
+                deckPicker.startActivity(
+                    AnkiquestHomeActivity
+                        .intent(deckPicker, tab)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                )
+            }
+            item.itemId == R.id.ankiquest_nav_decks
+        }
+        return
+    }
 
     NavigationItem.populateMenu(bottomNav, deckPicker)
 
@@ -76,6 +112,10 @@ fun setupBottomNavigation() {
 
 context(deckPicker: DeckPicker)
 fun showRestoredBottomNavTab() {
+    if (AnkiquestNavigation.enabled() && !deckPicker.fragmented) {
+        deckPicker.binding.bottomNavigation?.selectedItemId = R.id.ankiquest_nav_decks
+        return
+    }
     if (!Prefs.devBottomNavEnabled || deckPicker.fragmented) return
     val bottomNav = deckPicker.binding.bottomNavigation ?: return
     bottomNav.selectedItemId = bottomNav.selectedItemId

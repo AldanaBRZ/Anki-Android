@@ -18,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import kotlinx.coroutines.CompletableDeferred
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
@@ -29,6 +30,7 @@ import org.robolectric.fakes.RoboMenu
 import org.xmlpull.v1.XmlPullParser
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -106,7 +108,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
         val controller = Robolectric.buildActivity(AnkiquestActivity::class.java).create().also { shadowOf(Looper.getMainLooper()).idle() }
         saveControllerForCleanup(controller)
         val webView = controller.get().findViewById<WebView>(R.id.web_view)
-        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/?embed=1#cerro")
         val script = assertNotNull(shadowOf(webView).lastEvaluatedJavascript)
         assertTrue(script.contains("saved-test-token"))
         assertTrue(script.contains("ankiquest-auth"))
@@ -169,6 +171,114 @@ class AnkiquestSettingsTest : RobolectricTest() {
     }
 
     @Test
+    fun `every embedded native destination keeps the configured prefix and encoded fragment`() {
+        val routes = listOf("/", "/community", "/records", "/hour", "/day", "/week", "/month", "/year", "/all")
+        for (prefix in listOf("/", "/prefix/")) {
+            val dashboard = "https://quest.example$prefix#member%20name"
+            val session = AnkiquestWebSession(dashboard, "member name", "test-token")
+            for (route in routes) {
+                for (fragment in listOf("", "#member%20name", "#challenge-42")) {
+                    val destination = AnkiquestActivity.destinationUrl(dashboard, "$route$fragment")
+                    val expected = "https://quest.example$prefix${route.removePrefix("/")}?embed=1$fragment"
+                    assertEquals(expected, destination)
+                    assertTrue(session.allows(destination), destination)
+                    assertNotNull(session.script(destination), destination)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `embedded community calendars accept either order of the two supported parameters`() {
+        for (prefix in listOf("/", "/prefix/")) {
+            val session = AnkiquestWebSession("https://quest.example$prefix#member", "member", "test-token")
+            for (period in listOf("day", "week", "month")) {
+                for (query in listOf("period=$period&embed=1", "embed=1&period=$period")) {
+                    val url = "https://quest.example${prefix}community?$query#calendar"
+                    assertTrue(session.allows(url), url)
+                    assertNotNull(session.script(url), url)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `embedded documents reject duplicate unknown empty and encoded query parameters`() {
+        val routes = listOf("", "community", "records", "hour", "day", "week", "month", "year", "all")
+        val queries =
+            listOf(
+                "",
+                "embed",
+                "embed=",
+                "embed=0",
+                "embed=2",
+                "embed=true",
+                "embed=1&embed=1",
+                "embed=1&embed=0",
+                "embed=1&unknown=x",
+                "unknown=x&embed=1",
+                "embed=1&token=test-token",
+                "embed=1&",
+                "&embed=1",
+                "embed=1?unknown=x",
+                "%65mbed=1",
+                "embed=%31",
+                "period=year&embed=1",
+                "period=&embed=1",
+                "period=day&period=day&embed=1",
+                "period=day&period=week&embed=1",
+                "period=day&embed=1&embed=1",
+                "embed=1&period=day&embed=0",
+                "period=day&embed=1&unknown=x",
+                "%70eriod=day&embed=1",
+                "period=%64ay&embed=1",
+            )
+        for (prefix in listOf("/", "/prefix/")) {
+            val session = AnkiquestWebSession("https://quest.example$prefix#member", "member", "test-token")
+            for (route in routes) {
+                for (query in queries) {
+                    val url = "https://quest.example$prefix$route?$query#member%20name"
+                    assertFalse(session.allows(url), url)
+                    assertNull(session.script(url), url)
+                }
+                if (route != "community") {
+                    for (query in listOf("period=day", "period=day&embed=1", "embed=1&period=day")) {
+                        val url = "https://quest.example$prefix$route?$query#calendar"
+                        assertFalse(session.allows(url), url)
+                        assertNull(session.script(url), url)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `embed does not authorize other paths origins or URL credentials`() {
+        val session = AnkiquestWebSession("https://quest.example/prefix/#member", "member", "test-token")
+        val rejected =
+            listOf(
+                "https://quest.example/prefix/auth/session?embed=1",
+                "https://quest.example/prefix/api/profile/member?embed=1",
+                "https://quest.example/prefix/unknown?embed=1",
+                "https://quest.example/prefix/community/extra?embed=1",
+                "https://quest.example/prefix/community/?embed=1",
+                "https://quest.example/community?embed=1",
+                "https://quest.example/prefix-other/community?embed=1",
+                "http://quest.example/prefix/community?embed=1",
+                "https://quest.example:8443/prefix/community?embed=1",
+                "https://other.example/prefix/community?embed=1",
+                "https://user@quest.example/prefix/community?embed=1",
+            )
+        for (url in rejected) {
+            assertFalse(session.allows(url), url)
+            assertNull(session.script(url), url)
+        }
+        val defaultPort = "https://quest.example:443/prefix/community?embed=1#member%20name"
+        assertTrue(session.allows(defaultPort), defaultPort)
+        assertNotNull(session.script(defaultPort), defaultPort)
+    }
+
+    @Test
     fun `removing saved credentials clears the page session`() {
         val session = AnkiquestWebSession("https://quest.example/#cerro", "cerro", "")
         assertTrue(assertNotNull(session.script("https://quest.example/")).contains("window.ankiquestSession = null"))
@@ -198,7 +308,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
                 .also { shadowOf(Looper.getMainLooper()).idle() }
         saveControllerForCleanup(controller)
         val webView = controller.get().findViewById<WebView>(R.id.web_view)
-        assertEquals("https://quest.example/anki/community#reminders", shadowOf(webView).lastLoadedUrl)
+        assertEquals("https://quest.example/anki/community?embed=1#reminders", shadowOf(webView).lastLoadedUrl)
         shadowOf(webView).webViewClient.onPageFinished(webView, shadowOf(webView).lastLoadedUrl)
         assertTrue(assertNotNull(shadowOf(webView).lastEvaluatedJavascript).contains("saved-test-token"))
     }
@@ -209,7 +319,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
         saveControllerForCleanup(controller)
         val webView = controller.get().findViewById<WebView>(R.id.web_view)
         webView.loadUrl("https://quest.example/anki/login")
-        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/?embed=1#cerro")
         assertNull(shadowOf(webView).lastEvaluatedJavascript)
     }
 
@@ -233,6 +343,46 @@ class AnkiquestSettingsTest : RobolectricTest() {
     }
 
     @Test
+    fun `equivalent URL edits restart a pending bootstrap with the new fingerprint`() {
+        val firstBootstrap = CompletableDeferred<String?>()
+        var bootstrapCalls = 0
+        coEvery { Ankiquest.dashboardSession("https://quest.example/anki/#cerro") } coAnswers {
+            if (++bootstrapCalls == 1) firstBootstrap.await() else null
+        }
+        val controller =
+            Robolectric
+                .buildActivity(AnkiquestActivity::class.java)
+                .create()
+                .also { shadowOf(Looper.getMainLooper()).idle() }
+                .start()
+                .resume()
+        saveControllerForCleanup(controller)
+        val activity = controller.get()
+        val webView = activity.findViewById<WebView>(R.id.web_view)
+        assertEquals(1, bootstrapCalls)
+        assertFalse(firstBootstrap.isCompleted)
+        val previousSession = Ankiquest.webSession()
+        val previousFingerprint = AnkiquestNavigation.accountFingerprint()
+        val menu = RoboMenu()
+        activity.onCreateOptionsMenu(menu)
+        activity.onOptionsItemSelected(menu.findItem(R.id.ankiquest_settings))
+        controller.pause()
+        AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.URL_KEY, "https://quest.example/anki/") }
+        assertEquals(previousSession, Ankiquest.webSession())
+        assertNotEquals(previousFingerprint, AnkiquestNavigation.accountFingerprint())
+        controller.resume()
+        assertEquals("about:blank", shadowOf(webView).lastLoadedUrl)
+        shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
+        shadowOf(Looper.getMainLooper()).idle()
+        val destination = "https://quest.example/anki/?embed=1#cerro"
+        assertEquals(destination, shadowOf(webView).lastLoadedUrl)
+        coVerify(exactly = 2) { Ankiquest.dashboardSession("https://quest.example/anki/#cerro") }
+        firstBootstrap.complete(null)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(destination, shadowOf(webView).lastLoadedUrl)
+    }
+
+    @Test
     fun `changing accounts reloads and clears history after the new page arrives`() {
         val controller =
             Robolectric
@@ -250,16 +400,16 @@ class AnkiquestSettingsTest : RobolectricTest() {
         }
         controller.resume()
         assertEquals("about:blank", shadowOf(webView).lastLoadedUrl)
-        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/?embed=1#cerro")
         assertNull(shadowOf(webView).lastEvaluatedJavascript)
         shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals("https://quest.example/anki/#hill", shadowOf(webView).lastLoadedUrl)
+        assertEquals("https://quest.example/anki/?embed=1#hill", shadowOf(webView).lastLoadedUrl)
         assertFalse(shadowOf(webView).wasClearHistoryCalled())
-        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#cerro")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/?embed=1#cerro")
         assertFalse(shadowOf(webView).wasClearHistoryCalled())
         assertNull(shadowOf(webView).lastEvaluatedJavascript)
-        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/#hill")
+        shadowOf(webView).webViewClient.onPageFinished(webView, "https://quest.example/anki/?embed=1#hill")
         assertTrue(shadowOf(webView).wasClearHistoryCalled())
         val script = assertNotNull(shadowOf(webView).lastEvaluatedJavascript)
         assertTrue(script.contains("new-token"))
@@ -285,7 +435,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
         assertEquals("about:blank", shadowOf(webView).lastLoadedUrl)
         shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals("https://quest.example/anki/#cerro", shadowOf(webView).lastLoadedUrl)
+        assertEquals("https://quest.example/anki/?embed=1#cerro", shadowOf(webView).lastLoadedUrl)
         shadowOf(webView).webViewClient.onPageFinished(webView, shadowOf(webView).lastLoadedUrl)
         val script = assertNotNull(shadowOf(webView).lastEvaluatedJavascript)
         assertTrue(script.contains("replacement-token"))
@@ -309,9 +459,9 @@ class AnkiquestSettingsTest : RobolectricTest() {
         shadowOf(webView).webViewClient.onPageFinished(webView, "about:blank")
         shadowOf(Looper.getMainLooper()).idle()
         val chrome = assertNotNull(shadowOf(webView).webChromeClient)
-        assertEquals("https://new.example/quest/#cerro", shadowOf(webView).lastLoadedUrl)
+        assertEquals("https://new.example/quest/?embed=1#cerro", shadowOf(webView).lastLoadedUrl)
         assertTrue(chrome.onShowFileChooser(webView, mockk(relaxed = true), mockk()))
-        webView.loadUrl("https://quest.example/anki/#cerro")
+        webView.loadUrl("https://quest.example/anki/?embed=1#cerro")
         assertFalse(chrome.onShowFileChooser(webView, mockk(relaxed = true), mockk()))
     }
 }

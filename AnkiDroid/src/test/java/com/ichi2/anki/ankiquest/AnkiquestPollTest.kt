@@ -69,7 +69,7 @@ class AnkiquestPollTest : RobolectricTest() {
         every { AnkiquestWidget.render(any(), any(), any(), any()) } just Runs
         every { AnkiquestNotifier.onLeaderboard(any(), any()) } just Runs
         every { AnkiquestNotifier.onProfile(any(), any()) } just Runs
-        every { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) } just Runs
+        every { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) } just Runs
 
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
@@ -130,7 +130,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
         }
 
     @Test
@@ -141,7 +141,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
         }
 
     @Test
@@ -151,7 +151,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
         }
 
     @Test
@@ -161,7 +161,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.retry(), worker().doWork())
 
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -195,7 +195,7 @@ class AnkiquestPollTest : RobolectricTest() {
                 inboxStatus = status
                 assertEquals(Result.success(), worker().doWork(), "HTTP $status needs settings or server support")
             }
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -205,7 +205,7 @@ class AnkiquestPollTest : RobolectricTest() {
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
@@ -216,19 +216,21 @@ class AnkiquestPollTest : RobolectricTest() {
             assertEquals(Result.success(), worker().doWork())
 
             assertTrue(requests.none { it.startsWith("/api/notifications/") })
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) }
         }
 
     @Test
     fun `inbox response retains its captured account when settings change`() =
         runBlocking {
+            val expectedScope = requireNotNull(AnkiquestHomeData.account()).scope
             switchAccountDuringInbox = true
 
             assertEquals(Result.success(), worker().doWork())
 
             assertEquals("other", Ankiquest.player())
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
-            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), "$url/other", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), expectedScope) }
+            verify(exactly = 0) { AnkiquestNotifier.onDeckCompletions(any(), "$url/other", any(), any()) }
+            assertTrue(requests.none { it == "/api/avatars" })
         }
 
     @Test
@@ -244,7 +246,7 @@ class AnkiquestPollTest : RobolectricTest() {
     @Test
     fun `cancellation during inbox delivery is propagated`(): Unit =
         runBlocking {
-            every { AnkiquestNotifier.onDeckCompletions(any(), any(), any()) } throws CancellationException("Worker stopped")
+            every { AnkiquestNotifier.onDeckCompletions(any(), any(), any(), any()) } throws CancellationException("Worker stopped")
 
             assertFailsWith<CancellationException> { worker().doWork() }
         }
@@ -252,11 +254,12 @@ class AnkiquestPollTest : RobolectricTest() {
     @Test
     fun `photo failure happens after inbox delivery and cannot request retry`() =
         runBlocking {
+            val expectedScope = requireNotNull(AnkiquestHomeData.account()).scope
             avatarStatus = 503
 
             assertEquals(Result.success(), worker().doWork())
 
-            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any()) }
+            verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), expectedScope) }
             val inbox = requests.indexOfFirst { it.startsWith("/api/notifications/") }
             assertTrue(inbox >= 0)
             assertTrue(requests.indexOf("/api/avatars") > inbox)

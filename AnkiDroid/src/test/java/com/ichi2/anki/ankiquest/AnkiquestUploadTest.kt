@@ -123,7 +123,8 @@ class AnkiquestUploadTest : RobolectricTest() {
     @Test
     fun `a reply carries the message to the server and names who heard it`() =
         runBlocking {
-            assertEquals("Hill", Ankiquest.reply(7, "Good job!"))
+            val account = AnkiquestHomeData.account()!!
+            assertEquals("Hill", Ankiquest.reply(7, "Good job!", account.notificationAccount, account.scope))
 
             val sent = requests.single { it.path == "/api/reply/cerro" }
             assertEquals("POST", sent.method)
@@ -143,6 +144,8 @@ class AnkiquestUploadTest : RobolectricTest() {
                     .putString(AnkiquestReply.TITLE_KEY, "Deck complete")
                     .putString(AnkiquestReply.BODY_KEY, "Cerro has finished Spanish for today.")
                     .putString(AnkiquestReply.MESSAGE_KEY, "Good job!")
+                    .putString(AnkiquestReply.ACCOUNT_KEY, AnkiquestHomeData.account()!!.notificationAccount)
+                    .putString(AnkiquestReply.SCOPE_KEY, AnkiquestHomeData.account()!!.scope)
                     .build()
             assertEquals(AnkiquestReply.Outcome.SENT, AnkiquestReply.run(targetContext, data, 0))
 

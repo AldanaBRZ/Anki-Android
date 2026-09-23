@@ -72,7 +72,8 @@ object AnkiquestPoll {
     suspend fun run(context: Context): Result {
         val prefs = AnkiDroidApp.sharedPrefs()
         val configured = Ankiquest.dashboardUrl() != null
-        val photoScope = runCatching { AnkiquestAvatars.account()?.scope }.getOrNull()
+        val photoAccount = runCatching { AnkiquestAvatars.account() }.getOrNull()
+        val photoScope = photoAccount?.scope
         var photoBoard: JSONArray? = null
         var photoFetchedAt = 0L
         var photoOffline = false
@@ -122,8 +123,8 @@ object AnkiquestPoll {
         }
         val result =
             try {
-                Ankiquest.completionNotifications()?.let { (account, notifications) ->
-                    AnkiquestNotifier.onDeckCompletions(context, account, notifications)
+                Ankiquest.completionNotifications()?.let { (account, notifications, scope) ->
+                    AnkiquestNotifier.onDeckCompletions(context, account, notifications, scope)
                 }
                 Result.success()
             } catch (e: CancellationException) {
@@ -145,7 +146,10 @@ object AnkiquestPoll {
             }
             if (!stillCurrent()) return@let
             try {
-                AnkiquestAvatars.refresh((0 until board.length()).map { board.getJSONObject(it).getString("user") })
+                AnkiquestAvatars.refresh(
+                    (0 until board.length()).map { board.getJSONObject(it).getString("user") },
+                    photoAccount,
+                )
                 if (stillCurrent()) AnkiquestWidget.render(context, board, photoFetchedAt, photoOffline)
             } catch (e: CancellationException) {
                 throw e

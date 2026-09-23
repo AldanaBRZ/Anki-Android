@@ -115,6 +115,17 @@ android {
         // This ensures the correct ordering between the various types of releases (dev < alpha < beta < release) which is
         // needed for upgrades to be offered correctly.
         versionCode=22500201
+        // Quest tags have their own monotonic upgrade sequence, independent of
+        // the upstream beta version. Keep the eight-digit ABI-split budget.
+        if ((project.findProperty("customSuffix") ?: "").toString().replaceFirst(/^\.*/, "") == "quest") {
+            def questRelease = (project.findProperty("ankiquestRelease") ?: "0").toString()
+            if (!(questRelease ==~ /[0-9]{1,7}/)) {
+                throw new GradleException("ankiquestRelease must be a nonnegative release number")
+            }
+            if (questRelease.toInteger() > 0) {
+                versionCode = 50000000 + questRelease.toInteger()
+            }
+        }
         // If you change this to a new version, you probably also want to update .gradle/workflows/milestone.yml for the new version...
         versionName="2.25.0beta1"
         minSdk = libs.versions.minSdk.get().toInteger()

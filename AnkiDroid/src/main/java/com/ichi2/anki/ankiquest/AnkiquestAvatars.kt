@@ -10,7 +10,6 @@ import android.net.Uri
 import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.ichi2.anki.AnkiDroidApp
-import com.ichi2.anki.settings.Prefs
 import com.ichi2.utils.openInputStreamSafe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -20,17 +19,19 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /** Optional, bounded photos. Nothing in this cache is needed to fetch scores or private messages. */
@@ -55,7 +56,14 @@ object AnkiquestAvatars {
         val user: String,
         val token: String,
     ) {
-        val scope: String get() = "$base\n$user"
+        // The identity may be compared or saved without exposing its credential.
+        val scope: String =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest("$base\u0000$user\u0000$token".toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+
+        override fun toString(): String = "AvatarAccount(base=$base, user=$user)"
 
         fun url(player: String = user): HttpUrl =
             base
@@ -82,10 +90,46 @@ object AnkiquestAvatars {
         // Keep the server and its credentials together if settings change during a refresh.
         val settings = AnkiDroidApp.sharedPrefs().all
         val url = (settings[Ankiquest.URL_KEY] as? String).orEmpty().trim().trimEnd('/')
-        val user = (settings[Ankiquest.USER_KEY] as? String).orEmpty().trim().ifEmpty { Prefs.username.orEmpty() }
+        // username is R.string.username_key. Read the fallback from this same snapshot.
+        val user =
+            (settings[Ankiquest.USER_KEY] as? String)
+                .orEmpty()
+                .trim()
+                .ifEmpty { (settings["username"] as? String).orEmpty().trim() }
         val token = (settings[Ankiquest.TOKEN_KEY] as? String).orEmpty().trim()
         if (url.isEmpty() || user.isEmpty()) return null
-        return Account("$url/".toHttpUrl(), user, token)
+        val base = "$url/".toHttpUrlOrNull() ?: return null
+        if (base.username.isNotEmpty() || base.password.isNotEmpty() || base.query != null || base.fragment != null) return null
+        return Account(base, user, token)
+    }
+
+    class AccountChanged : IllegalStateException("Your AnkiQuest account changed. Open profile pictures again.")
+
+    fun requireCurrent(captured: Account) {
+        if (account()?.scope != captured.scope) throw AccountChanged()
+    }
+
+    /** Caller holds mutex. Preferences can still change while a request is in flight. */
+    private fun requireCurrentLocked(captured: Account) {
+        val currentScope = account()?.scope
+        if (currentScope != captured.scope) {
+            if (currentScope == null || cached.scope != currentScope) {
+                cached = Cache("", emptyMap())
+                nextDownload = 0
+            }
+            throw AccountChanged()
+        }
+    }
+
+    private fun requireResponse(
+        captured: Account,
+        response: Response,
+    ) {
+        requireCurrentLocked(captured)
+        if (!response.isSuccessful) {
+            if (response.code == 401 || response.code == 403) cached = Cache("", emptyMap())
+            throw Ankiquest.HttpStatusException(response.code)
+        }
     }
 
     fun bitmap(user: String): Bitmap? {
@@ -95,77 +139,99 @@ object AnkiquestAvatars {
     }
 
     /** A successful manifest immediately drops removed/replaced photos, even if downloading fails. */
-    suspend fun refresh(users: List<String>) =
-        withContext(Dispatchers.IO) {
-            mutex.withLock {
-                val account = account() ?: return@withLock
-                val manifest =
-                    client
-                        .newCall(
-                            Request
-                                .Builder()
-                                .url(
-                                    account.base
-                                        .newBuilder()
-                                        .addPathSegments("api/avatars")
-                                        .build(),
-                                ).apply {
-                                    if (account.token.isNotEmpty()) header("Authorization", "Bearer ${account.token}")
-                                }.build(),
-                        ).execute()
-                        .use { response ->
-                            if (!response.isSuccessful) throw Ankiquest.HttpStatusException(response.code)
-                            JSONObject(response.body.byteStream().use { it.boundedBytes(256 * 1024).toString(Charsets.UTF_8) })
-                        }
-                if (cached.scope != account.scope) nextDownload = 0
-                val previous = cached.takeIf { it.scope == account.scope }?.photos.orEmpty()
-                val wanted =
-                    users
-                        .distinct()
-                        .take(MAX_CACHED)
-                        .mapNotNull { user ->
-                            val revision = manifest.opt(user) as? String
-                            if (revision != null && revisionFormat.matches(revision)) user to revision else null
-                        }.toMap()
-                val photos = previous.filter { (user, photo) -> wanted[user] == photo.revision }.toMutableMap()
-                cached = Cache(account.scope, photos.toMap())
-                val pending = wanted.filterKeys { it !in photos }.entries.toList()
-                if (pending.isEmpty()) return@withLock
-                val start = nextDownload % pending.size
-                val attempts = minOf(MAX_DOWNLOADS, pending.size)
-                nextDownload = (start + attempts) % pending.size
-                for (offset in 0 until attempts) {
-                    currentCoroutineContext().ensureActive()
-                    val (user, revision) = pending[(start + offset) % pending.size]
-                    try {
-                        val url =
-                            account
-                                .url(user)
-                                .newBuilder()
-                                .addQueryParameter("v", revision)
-                                .build()
-                        val request =
-                            Request
-                                .Builder()
-                                .url(url)
-                                .apply {
-                                    if (account.token.isNotEmpty()) header("Authorization", "Bearer ${account.token}")
-                                }.build()
-                        val bitmap =
-                            client.newCall(request).execute().use { response ->
-                                if (!response.isSuccessful) throw Ankiquest.HttpStatusException(response.code)
-                                decodePhoto(response.body.byteStream().use { it.boundedBytes(MAX_IMAGE_BYTES) }, 64)
-                            }
-                        photos[user] = Photo(revision, bitmap)
-                        cached = Cache(account.scope, photos.toMap())
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Timber.d(e, "ankiquest optional photo unavailable")
+    suspend fun refresh(users: List<String>) = refresh(users, account())
+
+    internal suspend fun refresh(
+        users: List<String>,
+        expected: Account?,
+    ) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val account =
+                expected ?: run {
+                    cached = Cache("", emptyMap())
+                    nextDownload = 0
+                    return@withLock
+                }
+            requireCurrentLocked(account)
+            if (cached.scope != account.scope) {
+                cached = Cache(account.scope, emptyMap())
+                nextDownload = 0
+            }
+            val manifest =
+                client
+                    .newCall(
+                        Request
+                            .Builder()
+                            .url(
+                                account.base
+                                    .newBuilder()
+                                    .addPathSegments("api/avatars")
+                                    .build(),
+                            ).apply {
+                                if (account.token.isNotEmpty()) header("Authorization", "Bearer ${account.token}")
+                            }.build(),
+                    ).execute()
+                    .use { response ->
+                        requireResponse(account, response)
+                        JSONObject(response.body.byteStream().use { it.boundedBytes(256 * 1024).toString(Charsets.UTF_8) })
                     }
+            requireCurrentLocked(account)
+            if (cached.scope != account.scope) nextDownload = 0
+            val previous = cached.takeIf { it.scope == account.scope }?.photos.orEmpty()
+            val wanted =
+                users
+                    .distinct()
+                    .take(MAX_CACHED)
+                    .mapNotNull { user ->
+                        val revision = manifest.opt(user) as? String
+                        if (revision != null && revisionFormat.matches(revision)) user to revision else null
+                    }.toMap()
+            val photos = previous.filter { (user, photo) -> wanted[user] == photo.revision }.toMutableMap()
+            cached = Cache(account.scope, photos.toMap())
+            val pending = wanted.filterKeys { it !in photos }.entries.toList()
+            if (pending.isEmpty()) return@withLock
+            val start = nextDownload % pending.size
+            val attempts = minOf(MAX_DOWNLOADS, pending.size)
+            nextDownload = (start + attempts) % pending.size
+            for (offset in 0 until attempts) {
+                currentCoroutineContext().ensureActive()
+                requireCurrentLocked(account)
+                val (user, revision) = pending[(start + offset) % pending.size]
+                try {
+                    val url =
+                        account
+                            .url(user)
+                            .newBuilder()
+                            .addQueryParameter("v", revision)
+                            .build()
+                    val request =
+                        Request
+                            .Builder()
+                            .url(url)
+                            .apply {
+                                if (account.token.isNotEmpty()) header("Authorization", "Bearer ${account.token}")
+                            }.build()
+                    val bitmap =
+                        client.newCall(request).execute().use { response ->
+                            requireResponse(account, response)
+                            decodePhoto(response.body.byteStream().use { it.boundedBytes(MAX_IMAGE_BYTES) }, 64)
+                        }
+                    requireCurrentLocked(account)
+                    photos[user] = Photo(revision, bitmap)
+                    cached = Cache(account.scope, photos.toMap())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: AccountChanged) {
+                    throw e
+                } catch (e: Ankiquest.HttpStatusException) {
+                    if (e.code == 401 || e.code == 403) throw e
+                    Timber.d(e, "ankiquest optional photo unavailable")
+                } catch (e: Exception) {
+                    Timber.d(e, "ankiquest optional photo unavailable")
                 }
             }
         }
+    }
 
     suspend fun prepare(
         context: Context,
@@ -183,9 +249,11 @@ object AnkiquestAvatars {
         bitmap: Bitmap,
     ) = withContext(Dispatchers.IO) {
         requireToken(account)
+        requireCurrent(account)
         val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
         require(bytes.size <= MAX_IMAGE_BYTES) { "This picture is too large." }
         mutex.withLock {
+            requireCurrentLocked(account)
             client
                 .newCall(
                     Request
@@ -196,12 +264,13 @@ object AnkiquestAvatars {
                         .build(),
                 ).execute()
                 .use { response ->
-                    if (!response.isSuccessful) throw Ankiquest.HttpStatusException(response.code)
+                    requireResponse(account, response)
                     val revision =
                         JSONObject(
                             response.body.byteStream().use { it.boundedBytes(4096).toString(Charsets.UTF_8) },
                         ).getString("revision")
                     check(revisionFormat.matches(revision)) { "Invalid profile picture revision." }
+                    requireCurrentLocked(account)
                     val photos =
                         cached
                             .takeIf { it.scope == account.scope }
@@ -218,6 +287,7 @@ object AnkiquestAvatars {
         withContext(Dispatchers.IO) {
             requireToken(account)
             mutex.withLock {
+                requireCurrentLocked(account)
                 client
                     .newCall(
                         Request
@@ -228,7 +298,7 @@ object AnkiquestAvatars {
                             .build(),
                     ).execute()
                     .use { response ->
-                        if (!response.isSuccessful) throw Ankiquest.HttpStatusException(response.code)
+                        requireResponse(account, response)
                         if (cached.scope == account.scope) cached = Cache(account.scope, cached.photos - account.user)
                     }
             }

@@ -29,6 +29,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.ichi2.anki.R
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
 /** Answering a deck completion from its notification: a canned cheer, or your own words. */
@@ -40,6 +41,8 @@ object AnkiquestReply {
     const val TITLE_KEY = "title"
     const val BODY_KEY = "body"
     const val MESSAGE_KEY = "message"
+    const val ACCOUNT_KEY = "ankiquest.reply_account"
+    const val SCOPE_KEY = "ankiquest.reply_scope"
     const val QUICK_ACTION = "com.ichi2.anki.ankiquest.REPLY_QUICK"
     const val CUSTOM_ACTION = "com.ichi2.anki.ankiquest.REPLY_CUSTOM"
 
@@ -55,7 +58,11 @@ object AnkiquestReply {
         tag: Int,
         title: String,
         body: String,
+        account: String?,
+        scope: String?,
     ): List<NotificationCompat.Action> {
+        val current = AnkiquestHomeData.account() ?: return emptyList()
+        if (scope.isNullOrEmpty() || current.scope != scope || current.notificationAccount != account) return emptyList()
         val cheer = context.getString(R.string.ankiquest_reply_cheer)
         val intent = { action: String, message: String? ->
             Intent(context, AnkiquestReplyReceiver::class.java)
@@ -65,6 +72,8 @@ object AnkiquestReply {
                 .putExtra(TITLE_KEY, title)
                 .putExtra(BODY_KEY, body)
                 .putExtra(MESSAGE_KEY, message)
+                .putExtra(ACCOUNT_KEY, account)
+                .putExtra(SCOPE_KEY, scope)
         }
         val pending = { action: String, message: String?, mutable: Boolean ->
             PendingIntent.getBroadcast(
@@ -99,7 +108,7 @@ object AnkiquestReply {
     ) {
         try {
             WorkManager.getInstance(context).enqueueUniqueWork(
-                "$WORK_NAME:${data.getInt(TAG_KEY, 0)}",
+                "$WORK_NAME:${data.getString(SCOPE_KEY)}:${data.getInt(TAG_KEY, 0)}",
                 ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequestBuilder<AnkiquestReplyWorker>()
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
@@ -131,6 +140,8 @@ object AnkiquestReply {
             .putString(TITLE_KEY, intent.getStringExtra(TITLE_KEY))
             .putString(BODY_KEY, intent.getStringExtra(BODY_KEY))
             .putString(MESSAGE_KEY, message)
+            .putString(ACCOUNT_KEY, intent.getStringExtra(ACCOUNT_KEY))
+            .putString(SCOPE_KEY, intent.getStringExtra(SCOPE_KEY))
             .build()
 
     suspend fun run(
@@ -140,17 +151,29 @@ object AnkiquestReply {
     ): Outcome {
         val message = data.getString(MESSAGE_KEY).orEmpty()
         val notification = data.getLong(NOTIFICATION_KEY, 0)
-        if (message.isEmpty() || notification <= 0) return Outcome.FAILED
+        val account = data.getString(ACCOUNT_KEY).orEmpty()
+        val scope = data.getString(SCOPE_KEY).orEmpty()
+        if (message.isEmpty() || notification <= 0 || account.isEmpty() || scope.isEmpty() || !current(data)) return Outcome.FAILED
         return try {
-            AnkiquestNotifier.onReplySent(context, data, Ankiquest.reply(notification, message))
+            AnkiquestNotifier.onReplySent(context, data, Ankiquest.reply(notification, message, account, scope))
             Outcome.SENT
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            // Never republish the old account's private notification after a switch.
+            if (!current(data)) return Outcome.FAILED
             Timber.w(e, "ankiquest reply failed")
             // A refused reply stays refused; only a broken connection is worth another try.
             val done = e is Ankiquest.Rejected || attempt + 1 >= ATTEMPTS
             if (done) AnkiquestNotifier.onReplyFailed(context, data)
             if (done) Outcome.FAILED else Outcome.RETRY
         }
+    }
+
+    internal fun current(data: Data): Boolean {
+        val account = AnkiquestHomeData.account() ?: return false
+        return account.token.isNotEmpty() && account.notificationAccount == data.getString(ACCOUNT_KEY) &&
+            account.scope == data.getString(SCOPE_KEY)
     }
 }
 

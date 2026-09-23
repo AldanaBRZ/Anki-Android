@@ -284,14 +284,21 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     suspend fun reply(
         notification: Long,
         message: String,
+        expectedAccount: String,
+        expectedScope: String,
     ): String =
         withContext(Dispatchers.IO) {
-            val (url, user, token) = authenticatedEndpoint()
+            val account = AnkiquestHomeData.account() ?: throw Rejected(401)
+            if (account.token.isEmpty() || account.notificationAccount != expectedAccount ||
+                account.scope != expectedScope
+            ) {
+                throw Rejected(401)
+            }
             val request =
                 Request
                     .Builder()
-                    .url("$url/api/reply/$user")
-                    .header("Authorization", "Bearer $token")
+                    .url(account.url("api/reply/${account.encodedUser}"))
+                    .header("Authorization", "Bearer ${account.token}")
                     .post(
                         JSONObject()
                             .put("notification", notification)
@@ -300,28 +307,36 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                             .toRequestBody(json),
                     ).build()
             try {
-                execute(request).getString("sent_to")
+                val recipient = execute(request, sessionClient).getString("sent_to")
+                if (AnkiquestHomeData.account()?.scope != account.scope) throw Rejected(401)
+                recipient
             } catch (e: HttpStatusException) {
                 throw if (e.code in 400..499) Rejected(e.code) else e
             }
         }
 
-    /** The account key accompanies the response so a settings change cannot mix inbox cursors. */
-    suspend fun completionNotifications(): Pair<String, JSONArray>? =
+    internal data class CompletionNotifications(
+        val account: String,
+        val notifications: JSONArray,
+        val scope: String,
+    )
+
+    /** Preserve the exact fetch identity for both delivery cursors and queued reply actions. */
+    internal suspend fun completionNotifications(): CompletionNotifications? =
         withContext(Dispatchers.IO) {
-            if (AnkiDroidApp.sharedPrefs().getString(TOKEN_KEY, "").isNullOrBlank()) return@withContext null
-            val (url, user, token) = authenticatedEndpoint()
+            val account = AnkiquestHomeData.account() ?: return@withContext null
+            if (account.token.isEmpty()) return@withContext null
             client
                 .newCall(
                     Request
                         .Builder()
-                        .url("$url/api/notifications/$user")
-                        .header("Authorization", "Bearer $token")
+                        .url(account.url("api/notifications/${account.encodedUser}"))
+                        .header("Authorization", "Bearer ${account.token}")
                         .build(),
                 ).execute()
                 .use { response ->
                     if (!response.isSuccessful) throw HttpStatusException(response.code)
-                    "$url/$user" to JSONArray(response.body.string())
+                    CompletionNotifications(account.notificationAccount, JSONArray(response.body.string()), account.scope)
                 }
         }
 
@@ -601,8 +616,11 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             }
         }
 
-    private fun execute(request: Request): JSONObject =
-        client.newCall(request).execute().use { response ->
+    private fun execute(
+        request: Request,
+        requestClient: OkHttpClient = client,
+    ): JSONObject =
+        requestClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw HttpStatusException(response.code)
             JSONObject(response.body.string())
         }
@@ -745,7 +763,9 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                 gravity = Gravity.CENTER
                 isClickable = false
                 isFocusable = false
-                importantForAccessibility = TextView.IMPORTANT_FOR_ACCESSIBILITY_NO
+                // Discoverable when navigating with accessibility; the persistent session recap
+                // carries this feedback without interrupting every answer with an announcement.
+                importantForAccessibility = TextView.IMPORTANT_FOR_ACCESSIBILITY_YES
                 val pad = (10 * density).toInt()
                 setPadding(pad * 2, pad, pad * 2, pad)
                 elevation = 8 * density

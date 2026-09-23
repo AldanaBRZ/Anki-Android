@@ -62,7 +62,9 @@ object AnkiquestNotifier {
         context: Context,
         account: String,
         notifications: JSONArray,
+        scope: String? = null,
     ) {
+        if (scope != null && AnkiquestHomeData.account()?.scope != scope) return
         val prefs = AnkiDroidApp.sharedPrefs()
         val key = "ankiquestCompletionCursor:$account"
         val firstPollKey = "ankiquestCompletionFirstPollAt:$account"
@@ -92,8 +94,8 @@ object AnkiquestNotifier {
                     tag,
                     title,
                     body,
-                    dashboardIntent(context),
-                    if (answerable) AnkiquestReply.actions(context, id, tag, title, body) else emptyList(),
+                    notificationIntent(context, entry, account),
+                    if (answerable) AnkiquestReply.actions(context, id, tag, title, body, account, scope) else emptyList(),
                     entry.optString("kind") == "nudge",
                 ) == Delivery.DISABLED
             ) {
@@ -142,7 +144,15 @@ object AnkiquestNotifier {
                 val title = if (before == 0) "👑 $who took the crown" else "▼ $who passed you"
                 title to "You're now #${rank + 1}.$gap"
             }
-        notify(context, RANK_ID, title, body.trim(), dashboardIntent(context))
+        notify(
+            context,
+            RANK_ID,
+            title,
+            body.trim(),
+            Intent(context, AnkiquestActivity::class.java)
+                .putExtra(AnkiquestActivity.EXTRA_PATH, "/week")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     fun onProfile(
@@ -166,9 +176,9 @@ object AnkiquestNotifier {
         val freezes = profile.optInt("freezes")
         val body =
             if (freezes > 0) {
-                "Review a few cards to keep it. A freeze would cover you, but why spend it?"
+                context.getString(R.string.ankiquest_streak_protected)
             } else {
-                "Review a few cards to keep it. No freezes left."
+                context.getString(R.string.ankiquest_streak_gentle)
             }
         val open = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
         if (notify(context, STREAK_ID, "🔥 Your $streak day streak ends in ${left}h", body, open) != Delivery.DISABLED) {
@@ -182,13 +192,14 @@ object AnkiquestNotifier {
         data: Data,
         who: String,
     ) {
+        if (!AnkiquestReply.current(data)) return
         val message = data.getString(AnkiquestReply.MESSAGE_KEY).orEmpty()
         notify(
             context,
             data.getInt(AnkiquestReply.TAG_KEY, 0),
             data.getString(AnkiquestReply.TITLE_KEY).orEmpty(),
             context.getString(R.string.ankiquest_reply_sent, who, message),
-            dashboardIntent(context),
+            replyIntent(context, data),
             silent = true,
         )
     }
@@ -198,6 +209,7 @@ object AnkiquestNotifier {
         context: Context,
         data: Data,
     ) {
+        if (!AnkiquestReply.current(data)) return
         val tag = data.getInt(AnkiquestReply.TAG_KEY, 0)
         val title = data.getString(AnkiquestReply.TITLE_KEY).orEmpty()
         val body = data.getString(AnkiquestReply.BODY_KEY).orEmpty()
@@ -207,14 +219,46 @@ object AnkiquestNotifier {
             tag,
             title,
             context.getString(R.string.ankiquest_reply_failed, message),
-            dashboardIntent(context),
-            AnkiquestReply.actions(context, data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0), tag, title, body),
+            replyIntent(context, data),
+            AnkiquestReply.actions(
+                context,
+                data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0),
+                tag,
+                title,
+                body,
+                data.getString(AnkiquestReply.ACCOUNT_KEY),
+                data.getString(AnkiquestReply.SCOPE_KEY),
+            ),
             silent = true,
         )
     }
 
-    private fun dashboardIntent(context: Context): Intent =
-        Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    private fun replyIntent(
+        context: Context,
+        data: Data,
+    ): Intent =
+        AnkiquestHomeActivity
+            .intent(
+                context,
+                "activity",
+                notificationId = data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0).takeIf { it > 0 },
+            ).putExtra(AnkiquestHomeActivity.EXTRA_ACCOUNT, data.getString(AnkiquestReply.ACCOUNT_KEY))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** IDs are routed natively; server-supplied URLs never become arbitrary app destinations. */
+    internal fun notificationIntent(
+        context: Context,
+        entry: JSONObject,
+        account: String,
+    ): Intent =
+        AnkiquestHomeActivity
+            .intent(
+                context,
+                if (entry.optLong("challenge_id") > 0) "friends" else "activity",
+                entry.optLong("challenge_id").takeIf { it > 0 },
+                entry.optLong("id").takeIf { it > 0 },
+            ).putExtra(AnkiquestHomeActivity.EXTRA_ACCOUNT, account)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** Existing channel behavior belongs to Android settings, not app updates. */
     fun alertSettingsIntent(
