@@ -291,6 +291,7 @@ open class AnkiquestWidget : AppWidgetProvider() {
             val items = RemoteCollectionItems.Builder().setViewTypeCount(1)
             val me = Ankiquest.player()
             val numbers = NumberFormat.getIntegerInstance(AnkiquestLanguage.locale())
+            val languageContext = AnkiquestLanguage.context(context)
             val xpOf = { entry: JSONObject -> entry.optLong("xp", entry.optLong("week_xp")) }
             val leaderXp = board.optJSONObject(0)?.let(xpOf)?.coerceAtLeast(1) ?: 1
             for (i in 0 until board.length()) {
@@ -312,7 +313,34 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.ankiquest_widget_initial, if (photo == null) View.VISIBLE else View.GONE)
                 views.setViewVisibility(R.id.ankiquest_widget_avatar, if (photo == null) View.GONE else View.VISIBLE)
                 views.setImageViewBitmap(R.id.ankiquest_widget_avatar, photo)
-                views.setTextViewText(R.id.ankiquest_widget_streak, if (streak > 0) "🔥$streak" else "")
+                val state = streakState(entry)
+                val icon =
+                    when (state) {
+                        "studied" -> R.drawable.ankiquest_streak_studied
+                        "protected" -> R.drawable.ankiquest_streak_protected
+                        else -> R.drawable.ankiquest_streak_pending
+                    }
+                val label =
+                    when (state) {
+                        "studied" -> R.string.ankiquest_streak_studied
+                        "protected" -> R.string.ankiquest_streak_protected
+                        "pending" -> R.string.ankiquest_streak_pending
+                        else -> R.string.ankiquest_streak_unknown
+                    }
+                views.setTextViewText(R.id.ankiquest_widget_streak, if (streak > 0) numbers.format(streak) else "")
+                views.setTextViewCompoundDrawables(R.id.ankiquest_widget_streak, if (streak > 0) icon else 0, 0, 0, 0)
+                views.setContentDescription(
+                    R.id.ankiquest_widget_streak,
+                    if (streak > 0) {
+                        languageContext.getString(
+                            R.string.ankiquest_streak_description,
+                            numbers.format(streak),
+                            languageContext.getString(label),
+                        )
+                    } else {
+                        null
+                    },
+                )
                 views.setTextViewText(
                     R.id.ankiquest_widget_level,
                     AnkiquestLanguage.context(context).getString(R.string.ankiquest_widget_level, entry.getInt("level")),
@@ -323,6 +351,17 @@ open class AnkiquestWidget : AppWidgetProvider() {
                 items.addItem(i.toLong(), views)
             }
             return items.build()
+        }
+
+        private fun streakState(entry: JSONObject): String {
+            val dayEndsAt = entry.optLong("day_ends_at")
+            if (dayEndsAt > 0 && dayEndsAt <= TimeManager.time.intTimeMS()) return "unknown"
+            if (!entry.has("today_reviews") || entry.isNull("today_reviews")) return "unknown"
+            return when {
+                entry.optLong("today_reviews") > 0 -> "studied"
+                entry.optString("streak_state") == "protected" -> "protected"
+                else -> "pending"
+            }
         }
     }
 }

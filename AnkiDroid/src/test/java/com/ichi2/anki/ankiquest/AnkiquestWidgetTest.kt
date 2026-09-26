@@ -40,6 +40,68 @@ import kotlin.test.assertTrue
 @Config(sdk = [33])
 class AnkiquestWidgetTest : RobolectricTest() {
     @Test
+    fun `widget distinguishes studied pending and protected streaks in both styles`() {
+        val labels =
+            mapOf(
+                "studied" to "Studied today",
+                "pending" to "Not studied yet",
+                "protected" to "Streak protected · Not studied yet",
+            )
+        for (style in AnkiquestWidget.styles) {
+            for ((state, label) in labels) {
+                val entry =
+                    player("friend", 100, 100)
+                        .put("streak", 27)
+                        .put("streak_state", state)
+                        .put("today_reviews", if (state == "studied") 1 else 0)
+                        .put("day_ends_at", TimeManager.time.intTimeMS() + 3_600_000)
+                val row =
+                    AnkiquestWidget
+                        .collection(targetContext, JSONArray().put(entry), style)
+                        .getItemView(0)
+                        .apply(targetContext, FrameLayout(targetContext))
+                val streak = row.findViewById<TextView>(R.id.ankiquest_widget_streak)
+                assertEquals("27", streak.text.toString())
+                assertEquals("27 day streak · $label", streak.contentDescription?.toString())
+                assertNotNull(streak.compoundDrawables[0])
+            }
+        }
+    }
+
+    @Test
+    fun `widget does not show an expired cached streak as studied today`() {
+        val entry =
+            player("friend", 100, 100)
+                .put("streak", 27)
+                .put("streak_state", "studied")
+                .put("today_reviews", 2)
+                .put("day_ends_at", TimeManager.time.intTimeMS() - 1)
+        val row =
+            AnkiquestWidget
+                .collection(targetContext, JSONArray().put(entry))
+                .getItemView(0)
+                .apply(targetContext, FrameLayout(targetContext))
+        assertEquals(
+            "27 day streak · Refresh to see today's study status",
+            row.findViewById<TextView>(R.id.ankiquest_widget_streak).contentDescription?.toString(),
+        )
+    }
+
+    @Test
+    fun `older servers use today reviews and unknown data stays neutral`() {
+        for ((reviews, label) in listOf(0 to "Not studied yet", 1 to "Studied today", null to "Refresh to see today's study status")) {
+            val entry = player("friend", 100, 100).put("streak", 27)
+            if (reviews != null) entry.put("today_reviews", reviews)
+            val row =
+                AnkiquestWidget
+                    .collection(targetContext, JSONArray().put(entry))
+                    .getItemView(0)
+                    .apply(targetContext, FrameLayout(targetContext))
+            assertEquals("27 day streak · $label", row.findViewById<TextView>(R.id.ankiquest_widget_streak).contentDescription?.toString())
+        }
+    }
+
+    @Test
     fun `all eight players retain their ranks and display names`() {
         val items = AnkiquestWidget.collection(targetContext, leaderboard())
         assertEquals(8, items.itemCount)

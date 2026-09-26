@@ -114,4 +114,9 @@
     <string name="ankiquest_deck_collapse">Contraer submazos</string>
     <string name="ankiquest_deck_expand">Expandir submazos</string>
     <string name="ankiquest_deck_apply_subdecks">Aplicar a los submazos</string>
+    <string name="ankiquest_streak_studied">Estudió hoy</string>
+    <string name="ankiquest_streak_pending">Aún no ha estudiado</string>
+    <string name="ankiquest_streak_protected">Racha protegida · Aún no ha estudiado</string>
+    <string name="ankiquest_streak_unknown">Actualiza para ver si ha estudiado hoy</string>
+    <string name="ankiquest_streak_description">Racha de %1$s días · %2$s</string>
 </resources>
