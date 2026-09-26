@@ -67,16 +67,16 @@ object AnkiquestReply {
         if (scope.isNullOrEmpty() || current.scope != scope || current.notificationAccount != account) return emptyList()
         val quick =
             when (kind) {
-                "completion" -> context.getString(R.string.ankiquest_reply_cheer)
-                "reply" -> context.getString(R.string.ankiquest_reply_thanks)
-                "nudge" -> context.getString(R.string.ankiquest_reply_on_it)
+                "completion" -> AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_cheer)
+                "reply" -> AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_thanks)
+                "nudge" -> AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_on_it)
                 else -> null
             }
         val choices =
             when (kind) {
-                "completion" -> context.resources.getStringArray(R.array.ankiquest_reply_choices)
-                "reply" -> context.resources.getStringArray(R.array.ankiquest_reply_thanks_choices)
-                "nudge" -> context.resources.getStringArray(R.array.ankiquest_reply_nudge_choices)
+                "completion" -> AnkiquestLanguage.context(context).resources.getStringArray(R.array.ankiquest_reply_choices)
+                "reply" -> AnkiquestLanguage.context(context).resources.getStringArray(R.array.ankiquest_reply_thanks_choices)
+                "nudge" -> AnkiquestLanguage.context(context).resources.getStringArray(R.array.ankiquest_reply_nudge_choices)
                 else -> emptyArray()
             }
         val intent = { action: String, message: String? ->
@@ -103,7 +103,7 @@ object AnkiquestReply {
         val reply =
             RemoteInput
                 .Builder(MESSAGE_KEY)
-                .setLabel(context.getString(R.string.ankiquest_reply_hint))
+                .setLabel(AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_hint))
                 .setChoices(choices)
                 .build()
         return buildList {
@@ -116,8 +116,11 @@ object AnkiquestReply {
             }
             add(
                 NotificationCompat.Action
-                    .Builder(R.drawable.ic_star_notify, context.getString(R.string.ankiquest_reply), pending(CUSTOM_ACTION, null, true))
-                    .addRemoteInput(reply)
+                    .Builder(
+                        R.drawable.ic_star_notify,
+                        AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply),
+                        pending(CUSTOM_ACTION, null, true),
+                    ).addRemoteInput(reply)
                     .setAllowGeneratedReplies(false)
                     .build(),
             )

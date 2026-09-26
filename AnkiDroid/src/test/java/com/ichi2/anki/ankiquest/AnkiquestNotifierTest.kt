@@ -35,6 +35,35 @@ import kotlin.test.assertTrue
 @Config(sdk = [32])
 class AnkiquestNotifierTest : RobolectricTest() {
     @Test
+    fun `Spanish contextual replies follow the Anki language and retain notification kind`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        val account = replyAccount()
+        AnkiDroidApp.sharedPrefs().edit { putString("language", "es-ES") }
+        AnkiquestNotifier.onDeckCompletions(
+            targetContext,
+            account.notificationAccount,
+            JSONArray().put(message(1, 30).put("sender", "cerro").put("kind", "reply")),
+            account.scope,
+        )
+        val posted = shadowOf(manager).getNotification(5_140_001)
+        assertEquals(listOf("¡Gracias!", "Responder"), posted.actions.map { it.title.toString() })
+        assertTrue(
+            posted.actions
+                .last()
+                .remoteInputs
+                .single()
+                .choices
+                .any { it.toString() == "¡Te lo agradezco!" },
+        )
+        val intent = shadowOf(posted.actions.first().actionIntent).savedIntent
+        val data = AnkiquestReply.data(intent, AnkiquestReply.message(intent))
+        assertEquals("reply", data.getString("kind"))
+        assertEquals("¡Gracias!", data.getString(AnkiquestReply.MESSAGE_KEY))
+        AnkiquestNotifier.onReplyFailed(targetContext, data)
+        assertEquals(listOf("¡Gracias!", "Responder"), shadowOf(manager).getNotification(5_140_001).actions.map { it.title.toString() })
+    }
+
+    @Test
     fun `reply and nudge actions match the conversation and survive a failed retry`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         val account = replyAccount()
