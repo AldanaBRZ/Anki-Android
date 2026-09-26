@@ -5,6 +5,7 @@ package com.ichi2.anki.ankiquest
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -446,6 +447,9 @@ class AnkiquestAvatarsTest : RobolectricTest() {
         runBlocking {
             val board = JSONArray().put(JSONObject().put("user", "cerro").put("display", "Cerro").put("level", 1))
             AnkiquestAvatars.refresh(listOf("cerro"))
+            val circular = assertNotNull(AnkiquestAvatars.bitmap("cerro"))
+            assertEquals(0, Color.alpha(circular[0, 0]))
+            assertEquals(Color.BLUE, circular[circular.width / 2, circular.height / 2])
             for (style in AnkiquestWidget.styles) {
                 val row =
                     AnkiquestWidget
@@ -455,7 +459,9 @@ class AnkiquestAvatarsTest : RobolectricTest() {
                             style,
                         ).getItemView(0)
                         .apply(targetContext, FrameLayout(targetContext))
-                assertEquals(View.VISIBLE, row.findViewById<ImageView>(R.id.ankiquest_widget_avatar).visibility)
+                val avatar = row.findViewById<ImageView>(R.id.ankiquest_widget_avatar)
+                assertEquals(View.VISIBLE, avatar.visibility)
+                assertEquals(GradientDrawable.OVAL, (avatar.background as GradientDrawable).shape)
                 assertEquals(View.GONE, row.findViewById<TextView>(R.id.ankiquest_widget_initial).visibility)
             }
             revisions.remove("cerro")
@@ -485,6 +491,20 @@ class AnkiquestAvatarsTest : RobolectricTest() {
         assertEquals(256, result.height)
         assertFailsWith<IllegalArgumentException> { AnkiquestAvatars.decodePhoto("bad".toByteArray(), 256) }
     }
+
+    @Test
+    fun `picked photos retain their full aspect ratio until the user chooses a crop`() =
+        runBlocking {
+            val file = File.createTempFile("avatar-crop-", ".png", targetContext.cacheDir)
+            try {
+                file.writeBytes(png())
+                val prepared = AnkiquestAvatars.prepare(targetContext, file.toUri())
+                assertEquals(8, prepared.width)
+                assertEquals(4, prepared.height)
+            } finally {
+                file.delete()
+            }
+        }
 
     @Test
     fun `all EXIF orientations preserve the intended corner colors`() {
