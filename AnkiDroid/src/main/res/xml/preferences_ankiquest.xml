@@ -91,6 +91,13 @@
         android:key="@string/ankiquest_upload_all_key"
         android:title="@string/ankiquest_upload_all_title"
         android:summary="@string/ankiquest_upload_all_summary" />
+    <ListPreference
+        android:defaultValue="stable"
+        android:entries="@array/ankiquest_update_channel_entries"
+        android:entryValues="@array/ankiquest_update_channel_values"
+        android:key="@string/ankiquest_update_channel_key"
+        android:title="@string/ankiquest_update_channel_title"
+        app:useSimpleSummaryProvider="true" />
     <Preference
         android:key="@string/ankiquest_check_updates_key"
         android:title="@string/ankiquest_check_updates_title" />

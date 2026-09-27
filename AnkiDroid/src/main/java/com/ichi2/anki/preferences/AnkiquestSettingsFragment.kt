@@ -162,6 +162,10 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 AnkiquestUpdater.installed() ?: getString(R.string.ankiquest_local_build),
             )
         bindAction(R.string.ankiquest_check_updates_key) { AnkiquestUpdater.checkNow(requireActivity()) }
+        requirePreference<Preference>(R.string.ankiquest_update_channel_key).setOnPreferenceChangeListener { _, _ ->
+            AnkiquestUpdater.checkSoon()
+            true
+        }
     }
 
     private fun pictureAction(action: suspend () -> Unit) {
