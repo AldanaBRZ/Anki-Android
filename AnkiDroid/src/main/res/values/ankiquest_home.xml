@@ -16,7 +16,6 @@
     <string name="aq_home_next_step">Your next step</string>
     <string name="aq_home_study_due">Study %1$d due</string>
     <string name="aq_home_counts">%1$d reviews · %2$d learning · %3$d new</string>
-    <string name="aq_home_nothing_due">Nothing ready in this deck. Your next review will appear when due.</string>
     <string name="aq_home_change_deck">Change study focus</string>
     <string name="aq_home_open_decks">Open decks</string>
     <string name="aq_home_no_decks">Your study starts with a deck.</string>

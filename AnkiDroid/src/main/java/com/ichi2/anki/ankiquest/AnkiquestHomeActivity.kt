@@ -20,6 +20,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.core.widget.NestedScrollView
+import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
@@ -85,6 +86,29 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         render()
     }
 
+    private var localRefreshJob: kotlinx.coroutines.Job? = null
+
+    override fun onPause() {
+        localRefreshJob?.cancel()
+        super.onPause()
+    }
+
+    private fun scheduleLocalRefresh(nextAt: Long?) {
+        localRefreshJob?.cancel()
+        if (nextAt == null) return
+        localRefreshJob =
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(
+                    (
+                        nextAt -
+                            com.ichi2.anki.common.time.TimeManager.time
+                                .intTimeMS()
+                    ).coerceAtLeast(1_000L),
+                )
+                if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) refresh()
+            }
+    }
+
     override fun onResume() {
         super.onResume()
         if (!::content.isInitialized) return
@@ -104,6 +128,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                 val result = AnkiquestHomeData.local()
                 if (turn == generation) {
                     local = result
+                    scheduleLocalRefresh(result.nextUpdateAt)
                     localFailed = false
                     render()
                 }
@@ -171,10 +196,17 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             focus != null -> {
                 text(study, focus.name, heading = true)
                 text(study, getString(R.string.aq_home_counts, focus.review, focus.learning, focus.new), small = true)
-                if (focus.due > 0) {
-                    button(study, getString(R.string.aq_home_study_due, focus.due), primary = true) { openDecks(focus.id) }
-                } else {
-                    text(study, getString(R.string.aq_home_nothing_due), small = true)
+                val daily = focus.daily
+                val label = text(study, daily.label(this), small = true)
+                label.setTextColor(getColor(daily.color))
+                if (daily.icon != 0) {
+                    label.setCompoundDrawablesRelativeWithIntrinsicBounds(daily.icon, 0, 0, 0)
+                    TextViewCompat.setCompoundDrawableTintList(label, ColorStateList.valueOf(getColor(daily.color)))
+                    label.compoundDrawablePadding = dp(6)
+                }
+                if (daily.status == DailyDeckStatus.DONE) study.background = shape(R.color.aq_deck_done_background)
+                if (daily.status == DailyDeckStatus.REVIEW_NOW) {
+                    button(study, getString(R.string.aq_home_study_due, daily.readyCount.toInt()), primary = true) { openDecks(focus.id) }
                 }
                 button(study, R.string.aq_home_change_deck) { chooseDeck() }
             }
@@ -216,13 +248,14 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         val rows = local?.decks.orEmpty()
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.aq_home_change_deck)
-            .setItems(rows.map { "${it.name} · ${it.due}" }.toTypedArray()) { _, index ->
+            .setItems(rows.map { "${it.name} · ${it.daily.label(this)}" }.toTypedArray()) { _, index ->
                 lifecycleScope.launch {
                     try {
                         CollectionManager.withCol {
                             if (decks.get(rows[index].id) != null) decks.select(rows[index].id)
                         }
                         local = AnkiquestHomeData.local()
+                        scheduleLocalRefresh(local?.nextUpdateAt)
                         localFailed = false
                     } catch (e: CancellationException) {
                         throw e

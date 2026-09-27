@@ -45,6 +45,9 @@ class AnkiquestDecksTest : RobolectricTest() {
         assertEquals(0L, snapshot(1).getLong("remaining"))
         assertEquals(1L, snapshot(1).getLong("reviewed_today"))
         assertEquals(1L, snapshot(other).getLong("remaining"))
+        val states = AnkiquestDecks.dailyStates(col, TimeManager.time.intTimeMS())
+        assertEquals(DailyDeckStatus.DONE, states[1]?.status)
+        assertEquals(DailyDeckStatus.REVIEW_NOW, states[other]?.status)
     }
 
     @Test
@@ -74,6 +77,10 @@ class AnkiquestDecksTest : RobolectricTest() {
 
         assertEquals(1L, snapshot(child).getLong("remaining"))
         assertEquals(1L, snapshot(parent).getLong("remaining"))
+        val states = AnkiquestDecks.dailyStates(col, TimeManager.time.intTimeMS())
+        assertEquals(DailyDeckStatus.LEARNING_LATER, states[child]?.status)
+        assertEquals(DailyDeckStatus.LEARNING_LATER, states[parent]?.status)
+        assertEquals(card.due * 1000L, states[child]?.nextLearningAt)
     }
 
     @Test
@@ -85,6 +92,7 @@ class AnkiquestDecksTest : RobolectricTest() {
         col.updateCards(listOf(card))
 
         assertEquals(0L, snapshot(1).getLong("remaining"))
+        assertEquals(DailyDeckStatus.NOTHING_SCHEDULED, AnkiquestDecks.dailyStates(col, TimeManager.time.intTimeMS())[1]?.status)
     }
 
     @Test
@@ -112,6 +120,9 @@ class AnkiquestDecksTest : RobolectricTest() {
 
         assertEquals(1L, snapshot(1).getLong("remaining"))
         assertTrue(snapshots().none { it.getString("id") == filtered.toString() })
+        val state = AnkiquestDecks.dailyStates(col, TimeManager.time.intTimeMS())[1]
+        assertEquals(DailyDeckStatus.REVIEW_NOW, state?.status)
+        assertEquals(1L, state?.readyCount)
     }
 
     @Test
@@ -119,6 +130,7 @@ class AnkiquestDecksTest : RobolectricTest() {
         col.decks.id("Spanish")
         assertTrue(snapshots().any { it.getString("id") == "1" })
         assertEquals(0L, snapshot(1).getLong("reviewed_today"))
+        assertEquals(DailyDeckStatus.NOTHING_SCHEDULED, AnkiquestDecks.dailyStates(col, TimeManager.time.intTimeMS())[1]?.status)
     }
 
     private fun snapshot(id: Long): JSONObject = snapshots().single { it.getString("id") == id.toString() }

@@ -63,6 +63,7 @@ internal data class HomeDeck(
     val new: Int,
     val learning: Int,
     val review: Int,
+    val daily: DailyDeckState = DailyDeckState((new + learning + review).toLong(), (new + learning + review).toLong(), 0),
 ) {
     val due: Int get() = new + learning + review
 }
@@ -70,9 +71,11 @@ internal data class HomeDeck(
 internal data class HomeLocal(
     val decks: List<HomeDeck>,
     val selected: Long,
+    val nextUpdateAt: Long? = null,
 ) {
     val focus: HomeDeck? get() =
-        decks.firstOrNull { it.id == selected && it.due > 0 } ?: decks.firstOrNull { it.due > 0 }
+        decks.firstOrNull { it.id == selected && it.daily.status == DailyDeckStatus.REVIEW_NOW }
+            ?: decks.firstOrNull { it.daily.status == DailyDeckStatus.REVIEW_NOW }
             ?: decks.firstOrNull { it.id == selected }
             ?: decks.firstOrNull()
 }
@@ -109,11 +112,30 @@ internal object AnkiquestHomeData {
 
     suspend fun local(): HomeLocal =
         CollectionManager.withCol {
+            val now =
+                com.ichi2.anki.common.time.TimeManager.time
+                    .intTimeMS()
+            val tree = sched.deckDueTree()
+            val daily = AnkiquestDecks.dailyStates(this, now, tree)
             val rows =
-                sched.deckDueTree().filter { it.did != 0L }.map {
-                    HomeDeck(it.did, it.fullDeckName, it.newCount, it.lrnCount, it.revCount)
+                tree.filter { it.did != 0L }.map {
+                    HomeDeck(
+                        it.did,
+                        it.fullDeckName,
+                        it.newCount,
+                        it.lrnCount,
+                        it.revCount,
+                        daily[it.did]
+                            ?: DailyDeckState(
+                                (it.newCount + it.lrnCount + it.revCount).toLong(),
+                                (it.newCount + it.lrnCount + it.revCount).toLong(),
+                                0,
+                            ),
+                    )
                 }
-            HomeLocal(rows, decks.selected())
+            val cutoff = sched.dayCutoff * 1000L
+            val next = (daily.values.mapNotNull { it.nextLearningAt } + cutoff).filter { it > now }.minOrNull()
+            HomeLocal(rows, decks.selected(), next)
         }
 }
 

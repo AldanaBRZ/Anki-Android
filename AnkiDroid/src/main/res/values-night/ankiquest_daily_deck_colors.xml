@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="aq_deck_amber">#F0BC57</color>
+    <color name="aq_deck_green">#8CD79E</color>
+    <color name="aq_deck_done_background">#1B3426</color>
+</resources>

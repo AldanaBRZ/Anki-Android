@@ -145,6 +145,9 @@ class AnkiquestHomeDataTest : RobolectricTest() {
         assertEquals(24, selected.due)
         assertEquals(selected, HomeLocal(listOf(other, selected), 12).focus)
         assertEquals(other, HomeLocal(listOf(other, selected), 999).focus)
-        assertEquals(other, HomeLocal(listOf(selected.copy(new = 0, learning = 0, review = 0), other), 12).focus)
+        assertEquals(
+            other,
+            HomeLocal(listOf(selected.copy(new = 0, learning = 0, review = 0, daily = DailyDeckState(0, 0, 0)), other), 12).focus,
+        )
     }
 }

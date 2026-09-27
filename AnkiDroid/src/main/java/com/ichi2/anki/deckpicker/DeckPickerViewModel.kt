@@ -96,13 +96,16 @@ class DeckPickerViewModel :
      */
     private val flowOfRefreshDeckList = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    private val dailyDeckStates = MutableStateFlow<Map<DeckId, com.ichi2.anki.ankiquest.DailyDeckState>>(emptyMap())
+
     val flowOfDeckList =
         combine(
             flowOfDeckDueTree,
             flowOfCurrentDeckFilter,
             flowOfFocusedDeck,
             flowOfRefreshDeckList.onStart { emit(Unit) },
-        ) { tree, filter, _, _ ->
+            dailyDeckStates,
+        ) { tree, filter, _, _, daily ->
             if (tree == null) return@combine FlattenedDeckList.empty
 
             // TODO: use flowOfFocusedDeck once it's set on all instances
@@ -110,7 +113,7 @@ class DeckPickerViewModel :
             Timber.i("currentDeckId: %d", currentDeckId)
 
             FlattenedDeckList(
-                data = tree.filterAndFlattenDisplay(filter, currentDeckId),
+                data = tree.filterAndFlattenDisplay(filter, currentDeckId).map { it.withDailyState(daily[it.did]) },
                 hasSubDecks = tree.children.any { it.children.any() },
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = FlattenedDeckList.empty)
@@ -382,6 +385,15 @@ class DeckPickerViewModel :
                 val (deckDueTree, collectionHasNoCards) =
                     withCol {
                         Pair(sched.deckDueTree(), isEmpty)
+                    }
+                dailyDeckStates.value =
+                    withCol {
+                        com.ichi2.anki.ankiquest.AnkiquestDecks.dailyStates(
+                            this,
+                            com.ichi2.anki.common.time.TimeManager.time
+                                .intTimeMS(),
+                            deckDueTree,
+                        )
                     }
                 dueTree = deckDueTree
 
