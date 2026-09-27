@@ -63,6 +63,7 @@ import com.ichi2.anki.model.SortType
 import com.ichi2.anki.observability.ChangeManager
 import com.ichi2.anki.observability.undoableOp
 import com.ichi2.anki.preferences.SharedPreferencesProvider
+import com.ichi2.anki.settings.Prefs
 import com.ichi2.anki.utils.ext.getCardOrNull
 import com.ichi2.anki.utils.ext.setUserFlagForCards
 import kotlinx.coroutines.Deferred
@@ -77,6 +78,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.combineTransform
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flattenMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
@@ -148,6 +150,15 @@ class CardBrowserViewModel(
             extraBufferCapacity = 1,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
+
+    val flowOfLastCompletedSearch: StateFlow<SearchState.Completed?> =
+        flowOfSearchState
+            .filterIsInstance<SearchState.Completed>()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = null,
+            )
 
     /**
      * Commands to drive the note editor either in a fragment or a standalone activity
@@ -266,6 +277,8 @@ class CardBrowserViewModel(
     val isTruncated: Boolean get() = flowOfIsTruncated.value
 
     val shouldIgnoreAccents: Boolean get() = browserOptionsRepository.ignoreAccentsInSearch.value
+
+    val defaultBrowserSearch: String get() = browserOptionsRepository.defaultBrowserSearch.value
 
     private val _selectedRows: MutableSet<CardOrNoteId> = Collections.synchronizedSet(LinkedHashSet())
 
@@ -579,6 +592,11 @@ class CardBrowserViewModel(
         viewModelScope.launch {
             browserOptionsRepository.load()
 
+            // Apply the default search (if available)
+            if (Prefs.devUsingCardBrowserSearchView) {
+                searchTerms = searchTerms.ifEmpty { defaultBrowserSearch }
+            }
+
             val initialDeckId = if (selectAllDecks) SelectableDeck.AllDecks else getInitialDeck()
             // PERF: slightly inefficient if the source was lastDeckId
             setSelectedDeck(initialDeckId)
@@ -802,6 +820,12 @@ class CardBrowserViewModel(
     fun setTruncated(value: Boolean) = viewModelScope.launch { browserOptionsRepository.setIsTruncated(value) }
 
     fun setIgnoreAccents(value: Boolean) = viewModelScope.launch { browserOptionsRepository.setIgnoreAccentsInSearch(value) }
+
+    fun setDefaultSearchText(text: String) =
+        viewModelScope.launch {
+            if (!Prefs.devUsingCardBrowserSearchView) return@launch
+            browserOptionsRepository.setDefaultBrowserSearch(text)
+        }
 
     fun selectAll(): Job? {
         if (!_selectedRows.addAll(cards)) return null

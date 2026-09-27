@@ -84,6 +84,7 @@ import com.ichi2.anki.utils.ext.onAllFragmentsLoaded
 import com.ichi2.ui.CardBrowserSearchView
 import com.ichi2.utils.AndroidUiUtils.hideKeyboard
 import com.ichi2.utils.LanguageUtil
+import kotlinx.coroutines.flow.filterNotNull
 import timber.log.Timber
 
 @Suppress("LeakingThis")
@@ -484,7 +485,6 @@ open class CardBrowser :
                     }
                 }
                 is SearchState.Completed -> {
-                    findViewById<TextView>(R.id.subtitle)?.text = searchState.formatCardCount(resources)
                     // HACK: required now we use MenuProvider for searches
                     // this causes a very brief flicker, as we call `setQuery` to restore the menu state
                     searchView?.post { searchView?.clearFocus() }
@@ -495,15 +495,27 @@ open class CardBrowser :
             }
         }
 
+        fun onLastCompletedSearchChanged(search: SearchState.Completed) {
+            findViewById<TextView>(R.id.subtitle)?.text = search.formatCardCount(resources)
+        }
+
         fun onNoteEditorCommand(command: NoteEditorCommand) {
             launchCatchingTask {
                 when (command) {
                     is NoteEditorCommand.LoadInPane -> {
                         binding.noteEditorFrame?.isVisible = true
-                        if (fragment?.hasUnsavedChanges() == true) {
-                            showSaveChangesDialog(command.destination)
-                        } else {
-                            loadNoteEditorFragment(command.destination)
+                        val editor = fragment
+                        when {
+                            // Issue 19737: the pane already displays this selection. Refresh it in
+                            // place: recreating the fragment is expensive enough to ANR when
+                            // searches complete in quick succession. If there are unsaved
+                            // changes, keep them: this is a redundant refresh, not a navigation
+                            editor != null && editor.isEditingSameCards(command.destination) ->
+                                if (!editor.hasUnsavedChanges()) {
+                                    editor.reloadNoteFromCollection()
+                                }
+                            editor?.hasUnsavedChanges() == true -> showSaveChangesDialog(command.destination)
+                            else -> loadNoteEditorFragment(command.destination)
                         }
                     }
                     is NoteEditorCommand.LaunchActivity -> {
@@ -523,6 +535,7 @@ open class CardBrowser :
         viewModel.flowOfDeckId.launchCollectionInLifecycleScope(::onDeckIdChanged)
         viewModel.flowOfMultiSelectModeChanged.launchCollectionInLifecycleScope(::onMultiSelectModeChanged)
         viewModel.flowOfSearchState.launchCollectionInLifecycleScope(::searchStateChanged)
+        viewModel.flowOfLastCompletedSearch.filterNotNull().launchCollectionInLifecycleScope(::onLastCompletedSearchChanged)
         viewModel.flowOfNoteEditorCommand.launchCollectionInLifecycleScope(::onNoteEditorCommand)
     }
 

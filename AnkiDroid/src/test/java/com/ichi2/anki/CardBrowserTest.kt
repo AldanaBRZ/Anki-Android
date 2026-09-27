@@ -108,6 +108,7 @@ import org.hamcrest.CoreMatchers.allOf
 import org.hamcrest.CoreMatchers.containsString
 import org.hamcrest.CoreMatchers.instanceOf
 import org.hamcrest.CoreMatchers.`is`
+import org.hamcrest.CoreMatchers.sameInstance
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.greaterThan
@@ -501,6 +502,29 @@ class CardBrowserTest : RobolectricTest() {
             scenario.onActivity { browser ->
                 assertThat("the deep link's search is applied", browser.viewModel.searchTerms, equalTo("dog"))
                 assertThat("only the matching note is shown", browser.viewModel.rowCount, equalTo(1))
+            }
+        }
+    }
+
+    @Test
+    fun cardCountIsShownAfterRecreation() {
+        ensureCollectionLoadIsSynchronous()
+        addBasicNote("dog", "barks")
+        addBasicNote("cat", "meows")
+
+        fun CardBrowser.subtitle() = findViewById<TextView>(R.id.subtitle).text.toString()
+
+        ActivityScenario.launch(CardBrowser::class.java).use { scenario ->
+            advanceRobolectricLooper()
+            scenario.onActivity { browser ->
+                assertThat("card count before recreation", browser.subtitle(), equalTo("2 cards shown"))
+            }
+
+            scenario.recreate()
+            advanceRobolectricLooper()
+
+            scenario.onActivity { browser ->
+                assertThat("card count after recreation", browser.subtitle(), equalTo("2 cards shown"))
             }
         }
     }
@@ -1784,6 +1808,43 @@ class CardBrowserTest : RobolectricTest() {
                 )
 
             assertMenusEqual(expectedMenuItems, menu)
+        }
+
+    @Test // Issue 19737 - recreating the editor is expensive enough to ANR when repeated
+    fun `pane editor is not recreated when a search returns the same row`() =
+        withBrowser(noteCount = 2, fragmented = true) {
+            val editorBeforeRefresh = assertNotNull(fragment, "note editor fragment")
+
+            // every `opExecuted` calls refreshBrowserUI() -> a new search
+            // the pane row is unchanged, so the pane editor does not need to be recreated
+            searchCards()
+            advanceRobolectricLooper()
+
+            assertThat("the pane editor is reused", fragment, sameInstance(editorBeforeRefresh))
+        }
+
+    @Test // Issue 19737
+    fun `pane editor refreshes when the note changes outside the editor`() =
+        withBrowser(noteCount = 1, fragmented = true) {
+            val editor = assertNotNull(fragment, "note editor fragment")
+            assertThat(editor.getFieldForTest(0).fieldText, equalTo("0"))
+
+            // simulate 'find & replace' in the browser: the note changes,
+            // then opExecuted calls refreshBrowserUI() -> a new search
+            val cardId = assertNotNull(viewModel.paneRow?.toCardId(viewModel.cardsOrNotes))
+            withCol {
+                val note = getCard(cardId).note(this)
+                note.setField(0, "replaced")
+                updateNote(note)
+            }
+            searchCards()
+            advanceRobolectricLooper()
+
+            assertThat(
+                "the pane editor shows the updated note",
+                fragment?.getFieldForTest(0)?.fieldText,
+                equalTo("replaced"),
+            )
         }
 
     @Test

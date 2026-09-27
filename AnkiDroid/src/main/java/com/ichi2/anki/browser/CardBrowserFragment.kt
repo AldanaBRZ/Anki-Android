@@ -1034,10 +1034,13 @@ class CardBrowserFragment :
             cardsAdapter.notifyDataSetChanged()
             progressIndicator.isVisible = searchState == Initializing || searchState == Searching
             if (searchState is SearchState.Completed) {
-                legacySubtitle?.text = searchState.formatCardCount(resources)
                 onSearchCompleted(searchState)
                 invalidateMenu()
             }
+        }
+
+        fun onLastCompletedSearchChanged(search: SearchState.Completed) {
+            legacySubtitle?.text = search.formatCardCount(resources)
         }
 
         fun onSelectedRowsChanged(rows: Set<Any>) {
@@ -1172,6 +1175,11 @@ class CardBrowserFragment :
             Timber.d("syncing searchview state from chip updates")
             val filters = search.filters
 
+            // Handle default search text
+            if (search.query.isNotEmpty() && searchBar?.text.isNullOrEmpty()) {
+                launchCatchingTask { searchBar?.setText(search.toUserSpannable()) }
+            }
+
             legacyDeckName?.text = filters.decks.firstOrNull()?.name ?: TR.sentenceCase.allDecks
             decksChip?.text = filters.decks.firstOrNull()?.name ?: TR.sentenceCase.allDecks
             decksChip?.hasCheckedBackground = filters.decks.any()
@@ -1183,7 +1191,10 @@ class CardBrowserFragment :
             cardStateChip?.chipIcon =
                 ContextCompat.getDrawable(requireContext(), filters.cardStates.firstOrNull().iconRes)?.also {
                     if (filters.cardStates.isEmpty()) {
-                        DrawableCompat.setTint(it, MaterialColors.getColor(requireContext(), androidx.appcompat.R.attr.colorPrimary, 0))
+                        DrawableCompat.setTint(
+                            it.mutate(),
+                            MaterialColors.getColor(requireContext(), androidx.appcompat.R.attr.colorPrimary, 0),
+                        )
                     }
                 }
             cardStateChip?.hasCheckedBackground = filters.cardStates.any()
@@ -1198,7 +1209,10 @@ class CardBrowserFragment :
             flagsChip?.chipIcon =
                 ContextCompat.getDrawable(requireContext(), filters.flags.firstOrNull().iconRes)?.also {
                     if (filters.flags.isEmpty()) {
-                        DrawableCompat.setTint(it, MaterialColors.getColor(requireContext(), androidx.appcompat.R.attr.colorPrimary, 0))
+                        DrawableCompat.setTint(
+                            it.mutate(),
+                            MaterialColors.getColor(requireContext(), androidx.appcompat.R.attr.colorPrimary, 0),
+                        )
                     }
                 }
             flagsChip?.hasCheckedBackground = filters.flags.any()
@@ -1247,6 +1261,7 @@ class CardBrowserFragment :
         activityViewModel.flowOfCardsUpdated.launchCollectionInLifecycleScope(::cardsUpdatedChanged)
         activityViewModel.flowOfMultiSelectModeChanged.launchCollectionInLifecycleScope(::onMultiSelectModeChanged)
         activityViewModel.flowOfSearchState.launchCollectionInLifecycleScope(::searchStateChanged)
+        activityViewModel.flowOfLastCompletedSearch.filterNotNull().launchCollectionInLifecycleScope(::onLastCompletedSearchChanged)
         activityViewModel.flowOfColumnHeadings.launchCollectionInLifecycleScope(::onColumnNamesChanged)
         activityViewModel.flowOfCardStateChanged.launchCollectionInLifecycleScope(::onCardsMarkedEvent)
         activityViewModel.flowOfToggleSelectionState.launchCollectionInLifecycleScope(::onToggleSelectionStateUpdated)
