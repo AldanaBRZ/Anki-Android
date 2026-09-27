@@ -15,7 +15,9 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.isVisible
+import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.R
+import com.ichi2.anki.ankiquest.AnkiquestNavigation
 import java.text.NumberFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -91,8 +93,7 @@ class ReviewHeatmapView
             }
             setLoading()
             findViewById<View>(R.id.review_heatmap_aki).isVisible =
-                com.ichi2.anki.ankiquest.AnkiquestNavigation
-                    .enabled()
+                AnkiDroidApp.sharedPrefsOrNull() != null && AnkiquestNavigation.enabled()
         }
 
         fun setData(data: ReviewHeatmapData) = setData(data, state)
