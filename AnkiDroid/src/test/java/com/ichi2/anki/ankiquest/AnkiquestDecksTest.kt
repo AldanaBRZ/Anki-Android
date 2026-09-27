@@ -88,6 +88,21 @@ class AnkiquestDecksTest : RobolectricTest() {
     }
 
     @Test
+    fun `the study day window is Anki's own`() {
+        val cutoff = col.sched.dayCutoff * 1000
+        val card = addBasicNote().firstCard()
+        card.queue = QueueType.Lrn
+        card.type = CardType.Lrn
+        card.due = (col.sched.dayCutoff + 60).toInt()
+        col.updateCards(listOf(card))
+        val laterClock = ((cutoff + 7_200_000).mod(86_400_000L) / 60_000).toInt()
+        val rows = AnkiquestDecks.snapshots(col, cutoff - 3_600_000, laterClock, 0)
+        val deck = (0 until rows.length()).map { rows.getJSONObject(it) }.single { it.getString("id") == "1" }
+
+        assertEquals(0L, deck.getLong("remaining"))
+    }
+
+    @Test
     fun `due cards in a filtered deck keep the home deck unfinished`() {
         val card = addBasicNote().firstCard()
         val filtered = col.decks.newFiltered("Practice")

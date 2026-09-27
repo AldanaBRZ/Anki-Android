@@ -23,8 +23,8 @@ internal object AnkiquestDecks {
         rolloverHour: Int,
     ): JSONArray {
         val day = day(now, offsetWestMinutes, rolloverHour)
-        val start = day * DAY_MS + offsetWestMinutes * 60_000L + rolloverHour * 3_600_000L
-        val end = start + DAY_MS
+        val end = col.sched.dayCutoff * 1000
+        val start = end - DAY_MS
         val names = col.decks.allNamesAndIds(includeFiltered = false)
         val tree = col.sched.deckDueTree().associateBy { it.did }
         val reviewed = mutableMapOf<Long, Long>()
