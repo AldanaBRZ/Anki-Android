@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="aki_name" translatable="false">Aki</string>
     <string name="aki_welcome">Aki is here to help. One card, one small step.</string>
     <string name="aki_review">A small step starts with one card.</string>
     <string name="aki_complete">Your cards are done for now. Nice work!</string>
