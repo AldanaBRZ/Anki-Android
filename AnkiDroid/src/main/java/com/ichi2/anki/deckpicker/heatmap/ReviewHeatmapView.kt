@@ -90,6 +90,9 @@ class ReviewHeatmapView
                 if (ReviewHeatmap.searchForDay(currentData, date) != null) onDaySelected?.invoke(currentData, date)
             }
             setLoading()
+            findViewById<View>(R.id.review_heatmap_aki).isVisible =
+                com.ichi2.anki.ankiquest.AnkiquestNavigation
+                    .enabled()
         }
 
         fun setData(data: ReviewHeatmapData) = setData(data, state)

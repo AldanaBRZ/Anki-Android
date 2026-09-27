@@ -161,6 +161,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
 
     private fun renderToday() {
         title(R.string.ankiquest_nav_today, R.string.aq_home_today_subtitle)
+        content.addView(AnkiquestAki.encouragement(this, AnkiquestAki.mood(local, profile)))
         profile?.let {
             text(content, getString(R.string.aq_home_streak_level, it.optInt("streak"), it.optInt("level")), small = true)
         }
@@ -191,11 +192,13 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         if (account == null) connectionCard()
         AnkiquestStudySession.latest()?.let { summary ->
             val panel = card()
+            panel.addView(AnkiquestAki.image(this, if (summary.remaining == 0) R.drawable.aki_celebrate else R.drawable.aki_streak, 56))
             text(panel, getString(R.string.aq_home_last_session), heading = true)
             text(panel, getString(R.string.aq_home_session_summary, summary.reviews, summary.duration(this), summary.remaining))
         }
         profile?.optJSONArray("quests")?.objects()?.let { quests ->
             if (quests.isNotEmpty()) {
+                if (quests.all { it.optBoolean("done") }) content.addView(AnkiquestAki.image(this, R.drawable.aki_winner, 56))
                 text(content, getString(R.string.aq_home_quests), heading = true)
                 quests.forEach { quest ->
                     val panel = card()

@@ -1549,7 +1549,19 @@ open class DeckPicker :
                         AlertDialog
                             .Builder(this@DeckPicker)
                             .setTitle(R.string.ankiquest_summary_title)
-                            .setMessage(
+                            .setView(
+                                com.ichi2.anki.ankiquest.AnkiquestAki.image(
+                                    this@DeckPicker,
+                                    if (summary.remaining ==
+                                        0
+                                    ) {
+                                        R.drawable.aki_celebrate
+                                    } else {
+                                        R.drawable.aki_streak
+                                    },
+                                    112,
+                                ),
+                            ).setMessage(
                                 getString(
                                     R.string.ankiquest_summary_body,
                                     summary.reviews,
