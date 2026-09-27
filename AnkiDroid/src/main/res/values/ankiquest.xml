@@ -121,6 +121,17 @@
     <string name="ankiquest_widget_offline_at">offline · %1$s</string>
     <string name="ankiquest_update_title">%1$s available</string>
     <string name="ankiquest_update_message">A new AnkiDroid Quest build is ready (%1$d MB). Your collection is kept.</string>
+    <string name="ankiquest_update_nightly_message">A new nightly build is ready (%1$d MB). Nightly builds are untested and can break. Your collection is kept.</string>
+    <string name="ankiquest_update_channel_key" translatable="false">ankiquestUpdateChannel</string>
+    <string name="ankiquest_update_channel_title" maxLength="41">Update channel</string>
+    <string-array name="ankiquest_update_channel_entries">
+        <item>Stable releases</item>
+        <item>Nightly builds (untested)</item>
+    </string-array>
+    <string-array name="ankiquest_update_channel_values" translatable="false">
+        <item>stable</item>
+        <item>nightly</item>
+    </string-array>
     <string name="ankiquest_update_install">Update</string>
     <string name="ankiquest_update_later">@string/button_backup_later</string>
     <string name="ankiquest_update_downloading">Downloading… %1$d%%</string>

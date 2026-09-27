@@ -41,11 +41,16 @@ import java.util.concurrent.TimeUnit
  * Offers new AnkiDroid Quest builds from the GitHub releases of the fork.
  *
  * Releases are tagged `quest-<n>` and CI bakes `<n>` into [BuildConfig.ANKIQUEST_RELEASE].
- * Local builds carry 0 and never check.
+ * Every push to the branch also replaces the `nightly` pre-release, whose builds carry the
+ * last release number plus [BuildConfig.ANKIQUEST_NIGHTLY] commits. Local builds carry 0 and never check.
  */
 object AnkiquestUpdater {
-    private const val LATEST_URL = "https://api.github.com/repos/float3/Anki-Android/releases/latest"
+    enum class Channel { STABLE, NIGHTLY }
+
+    private const val LATEST_URL = "https://api.github.com/repos/float3/AnkiQuest-Android/releases/latest"
+    private const val NIGHTLY_URL = "https://github.com/float3/AnkiQuest-Android/releases/download/nightly/"
     private const val TAG_PREFIX = "quest-"
+    const val CHANNEL_KEY = "ankiquestUpdateChannel"
     private const val CHECKED_AT_KEY = "ankiquestUpdateCheckedAt"
     private const val CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
 
@@ -60,12 +65,26 @@ object AnkiquestUpdater {
     @Volatile
     private var busy = false
 
-    private data class Release(
+    internal data class Release(
         val number: Int,
         val name: String,
         val apkUrl: String,
         val apkSize: Long,
+        val versionCode: Long = 0,
+        val nightly: Boolean = false,
     )
+
+    /** Makes the next deck list visit check again, e.g. after switching channel. */
+    fun checkSoon() = AnkiDroidApp.sharedPrefs().edit { remove(CHECKED_AT_KEY) }
+
+    fun channel(): Channel = if (AnkiDroidApp.sharedPrefs().getString(CHANNEL_KEY, null) == "nightly") Channel.NIGHTLY else Channel.STABLE
+
+    /** A stable release is newer by its number, a nightly by the version code Android compares on install. */
+    internal fun isNewer(
+        release: Release,
+        installedRelease: Int = BuildConfig.ANKIQUEST_RELEASE,
+        installedCode: Long = BuildConfig.VERSION_CODE.toLong(),
+    ): Boolean = if (release.nightly) release.versionCode > installedCode else release.number > installedRelease
 
     fun maybeCheck(activity: Activity) {
         if (BuildConfig.ANKIQUEST_RELEASE <= 0 || busy || activity !is DeckPicker) return
@@ -77,8 +96,8 @@ object AnkiquestUpdater {
         val host = WeakReference(activity)
         scope.launch {
             try {
-                val release = latest()
-                if (release != null && release.number > BuildConfig.ANKIQUEST_RELEASE) {
+                val release = available()
+                if (release != null && isNewer(release)) {
                     withContext(Dispatchers.Main) { host.get()?.let { offer(it, release) } }
                 }
             } catch (e: Exception) {
@@ -89,8 +108,15 @@ object AnkiquestUpdater {
         }
     }
 
-    /** The installed release, e.g. `quest-3`, or null for a local build. */
-    fun installed(): String? = BuildConfig.ANKIQUEST_RELEASE.takeIf { it > 0 }?.let { "$TAG_PREFIX$it" }
+    /** The installed release, e.g. `quest-3` or `quest-3 nightly 2 (1a2b3c4)`, or null for a local build. */
+    fun installed(): String? =
+        BuildConfig.ANKIQUEST_RELEASE.takeIf { it > 0 }?.let {
+            if (BuildConfig.ANKIQUEST_NIGHTLY > 0) {
+                "$TAG_PREFIX$it nightly ${BuildConfig.ANKIQUEST_NIGHTLY} (${BuildConfig.GIT_COMMIT_HASH.take(7)})"
+            } else {
+                "$TAG_PREFIX$it"
+            }
+        }
 
     /**
      * Checks for a newer release right away and offers it.
@@ -100,16 +126,42 @@ object AnkiquestUpdater {
     suspend fun checkNow(activity: Activity): String? {
         val release =
             try {
-                withContext(Dispatchers.IO) { latest() }
+                withContext(Dispatchers.IO) { available() }
             } catch (e: Exception) {
                 Timber.w(e, "ankiquest update check failed")
                 null
             } ?: return activity.getString(R.string.ankiquest_update_check_failed)
-        if (release.number <= BuildConfig.ANKIQUEST_RELEASE) {
-            return activity.getString(R.string.ankiquest_update_none, release.name)
+        if (!isNewer(release)) {
+            return activity.getString(R.string.ankiquest_update_none, installed() ?: release.name)
         }
         offer(activity, release)
         return null
+    }
+
+    private fun available(): Release? = if (channel() == Channel.NIGHTLY) nightly() else latest()
+
+    private fun nightly(): Release? {
+        val request = Request.Builder().url(NIGHTLY_URL + "nightly.json").build()
+        val json =
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                JSONObject(response.body.string())
+            }
+        return parseNightly(json)
+    }
+
+    internal fun parseNightly(json: JSONObject): Release? {
+        val number = json.optInt("release")
+        val versionCode = json.optLong("version_code")
+        if (number <= 0 || versionCode <= 0) return null
+        return Release(
+            number = number,
+            name = "Nightly $TAG_PREFIX$number+${json.optInt("nightly")} (${json.optString("commit").take(7)})",
+            apkUrl = NIGHTLY_URL + "AnkiDroid-Quest.apk",
+            apkSize = json.optLong("size"),
+            versionCode = versionCode,
+            nightly = true,
+        )
     }
 
     private fun latest(): Release? {
@@ -147,8 +199,12 @@ object AnkiquestUpdater {
         AlertDialog
             .Builder(activity)
             .setTitle(activity.getString(R.string.ankiquest_update_title, release.name))
-            .setMessage(activity.getString(R.string.ankiquest_update_message, release.apkSize / (1024 * 1024)))
-            .setPositiveButton(R.string.ankiquest_update_install) { _, _ -> download(activity, release) }
+            .setMessage(
+                activity.getString(
+                    if (release.nightly) R.string.ankiquest_update_nightly_message else R.string.ankiquest_update_message,
+                    release.apkSize / (1024 * 1024),
+                ),
+            ).setPositiveButton(R.string.ankiquest_update_install) { _, _ -> download(activity, release) }
             .setNegativeButton(R.string.ankiquest_update_later, null)
             .show()
     }
