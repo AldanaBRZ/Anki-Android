@@ -253,6 +253,33 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         }
     }
 
+    /** Celebrations are on unless the player turned them off; older servers have no setting and always celebrate. */
+    suspend fun celebrationsEnabled(): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            fetchDeckNotificationSettings(url, user, token).optBoolean("celebrations", true)
+        }
+    }
+
+    suspend fun setCelebrations(enabled: Boolean): JSONObject {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/decks/$user")
+                    .header("Authorization", "Bearer $token")
+                    .post(
+                        JSONObject()
+                            .put("decks", JSONArray())
+                            .put("celebrations", enabled)
+                            .toString()
+                            .toRequestBody(json),
+                    ).build(),
+            )
+        }
+    }
+
     /** Streak protection is stored on the server; never infer it from a local default. */
     suspend fun streakProtectionEnabled(): Boolean {
         val (url, user, token) = authenticatedEndpoint()

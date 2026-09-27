@@ -25,6 +25,9 @@
     <string name="ankiquest_nudges_key" translatable="false">ankiquestNudges</string>
     <string name="ankiquest_nudges_title" maxLength="41">Nudges</string>
     <string name="ankiquest_nudges_summary">Tell me when a place, my best day or the next level is within reach</string>
+    <string name="ankiquest_celebrations_key" translatable="false">ankiquestCelebrations</string>
+    <string name="ankiquest_celebrations_title" maxLength="41">Celebrations</string>
+    <string name="ankiquest_celebrations_summary">Congratulate me on achievements, streak milestones and personal bests</string>
     <string name="ankiquest_nudges_unavailable">Set the server, player and token first</string>
     <string name="ankiquest_message_alerts_key" translatable="false">ankiquestMessageAlerts</string>
     <string name="ankiquest_nudge_alerts_key" translatable="false">ankiquestNudgeAlerts</string>

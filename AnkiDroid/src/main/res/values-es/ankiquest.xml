@@ -26,6 +26,8 @@
     <string name="ankiquest_reply">Responder</string>
     <string name="ankiquest_nudges_title">Toques</string>
     <string name="ankiquest_nudges_summary">Avísame cuando pueda alcanzar un puesto, mi mejor día o el siguiente nivel</string>
+    <string name="ankiquest_celebrations_title">Celebraciones</string>
+    <string name="ankiquest_celebrations_summary">Felicítame por logros, rachas y récords personales</string>
     <string name="ankiquest_nudges_unavailable">Configura primero el servidor, el jugador y el token</string>
     <string name="ankiquest_message_alerts_title">Avisos de mensajes y estudio</string>
     <string name="ankiquest_reply_cheer">¡Buen trabajo!</string>
