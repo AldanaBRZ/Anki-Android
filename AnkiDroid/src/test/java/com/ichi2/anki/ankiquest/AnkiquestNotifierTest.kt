@@ -46,21 +46,17 @@ class AnkiquestNotifierTest : RobolectricTest() {
             account.scope,
         )
         val posted = shadowOf(manager).getNotification(5_140_001)
-        assertEquals(listOf("¡Gracias!", "Responder"), posted.actions.map { it.title.toString() })
-        assertTrue(
-            posted.actions
-                .last()
-                .remoteInputs
-                .single()
-                .choices
-                .any { it.toString() == "¡Te lo agradezco!" },
-        )
-        val intent = shadowOf(posted.actions.first().actionIntent).savedIntent
+        assertEquals(listOf("Responder"), posted.actions.map { it.title.toString() })
+        assertEquals(listOf("¡Gracias!", "¡Me alegraste el día!", "¡Te lo agradezco!"), choices(posted))
+        val intent = chose(posted, "¡Gracias!")
         val data = AnkiquestReply.data(intent, AnkiquestReply.message(intent))
         assertEquals("reply", data.getString("kind"))
         assertEquals("¡Gracias!", data.getString(AnkiquestReply.MESSAGE_KEY))
         AnkiquestNotifier.onReplyFailed(targetContext, data)
-        assertEquals(listOf("¡Gracias!", "Responder"), shadowOf(manager).getNotification(5_140_001).actions.map { it.title.toString() })
+        assertEquals(
+            listOf("¡Gracias!", "¡Me alegraste el día!", "¡Te lo agradezco!"),
+            choices(shadowOf(manager).getNotification(5_140_001)),
+        )
     }
 
     @Test
@@ -76,27 +72,43 @@ class AnkiquestNotifierTest : RobolectricTest() {
                 .put(message(3, 30).put("sender", "cerro").put("kind", "message")),
             account.scope,
         )
-        for ((id, kind, labels) in listOf(
-            Triple(1, "reply", listOf("Thanks!", "Reply")),
-            Triple(2, "nudge", listOf("On it!", "Reply")),
-            Triple(3, "message", listOf("Reply")),
+        for ((id, kind, suggestions) in listOf(
+            Triple(1, "reply", listOf("Thanks!", "You made my day!", "I appreciate it!")),
+            Triple(2, "nudge", listOf("On it!", "Starting now", "I will study later")),
+            Triple(3, "message", emptyList()),
         )) {
             val posted = shadowOf(manager).getNotification(5_140_000 + id)
-            assertEquals(labels, posted.actions.map { it.title.toString() })
-            val input =
-                posted.actions
-                    .last()
-                    .remoteInputs
-                    .single()
-            assertFalse(input.choices.orEmpty().any { it.toString() == "Good job!" })
-            assertFalse(posted.actions.last().allowGeneratedReplies)
-            val intent = shadowOf(posted.actions.first().actionIntent).savedIntent
-            val data = AnkiquestReply.data(intent, if (kind == "message") "Hello!" else AnkiquestReply.message(intent))
+            assertEquals(listOf("Reply"), posted.actions.map { it.title.toString() })
+            assertEquals(suggestions, choices(posted))
+            assertFalse(posted.actions.single().allowGeneratedReplies)
+            val intent = chose(posted, suggestions.firstOrNull() ?: "Hello!")
+            val data = AnkiquestReply.data(intent, AnkiquestReply.message(intent))
             assertEquals(kind, data.getString("kind"))
             AnkiquestNotifier.onReplyFailed(targetContext, data)
             val failed = shadowOf(manager).getNotification(5_140_000 + id)
-            assertEquals(labels, failed.actions.map { it.title.toString() })
+            assertEquals(listOf("Reply"), failed.actions.map { it.title.toString() })
+            assertEquals(suggestions, choices(failed))
         }
+    }
+
+    private fun choices(notification: Notification): List<String> =
+        notification.actions
+            .single()
+            .remoteInputs
+            .single()
+            .choices
+            .orEmpty()
+            .map { it.toString() }
+
+    private fun chose(
+        notification: Notification,
+        text: String,
+    ) = shadowOf(notification.actions.single().actionIntent).savedIntent.also {
+        RemoteInput.addResultsToIntent(
+            notification.actions.single().remoteInputs,
+            it,
+            Bundle().apply { putCharSequence(AnkiquestReply.MESSAGE_KEY, text) },
+        )
     }
 
     private fun replyAccount(): HomeAccount {
@@ -191,15 +203,20 @@ class AnkiquestNotifierTest : RobolectricTest() {
         )
         val posted = (1..3).map { shadowOf(manager).getNotification(5_140_000 + it) }
         assertEquals(3, shadowOf(manager).size())
-        assertEquals(
-            listOf("Good job!", "Reply"),
-            posted[0].actions.map { it.title.toString() },
-            "an unanswered completion offers both a cheer and free text",
+        assertEquals(listOf("Reply"), posted[0].actions.map { it.title.toString() })
+        assertEquals(listOf("Good job!", "Nice one \uD83D\uDD25", "Keep it up!"), choices(posted[0]), "the cheer is the first suggestion")
+        assertTrue(
+            posted[0]
+                .actions[0]
+                .remoteInputs
+                .single()
+                .allowFreeFormInput,
+            "an unanswered completion also takes free text",
         )
         assertNull(posted[1].actions, "an answered completion cannot be answered twice")
         assertNull(posted[2].actions, "a notification without a sender has nobody to answer")
 
-        val cheer = shadowOf(posted[0].actions[0].actionIntent).savedIntent
+        val cheer = chose(posted[0], "Good job!")
         assertEquals("Good job!", AnkiquestReply.message(cheer))
         val data = AnkiquestReply.data(cheer, AnkiquestReply.message(cheer))
         assertEquals(1L, data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0))
@@ -208,13 +225,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
         assertEquals(account.notificationAccount, data.getString(AnkiquestReply.ACCOUNT_KEY))
 
         val typed =
-            shadowOf(posted[0].actions[1].actionIntent).savedIntent.also {
-                RemoteInput.addResultsToIntent(
-                    posted[0].actions[1].remoteInputs,
-                    it,
-                    Bundle().apply { putCharSequence(AnkiquestReply.MESSAGE_KEY, "  proud of you  ") },
-                )
-            }
+            chose(posted[0], "  proud of you  ")
         assertEquals("proud of you", AnkiquestReply.message(typed))
     }
 
@@ -229,7 +240,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
             account.scope,
         )
         val incoming = shadowOf(manager).getNotification(5_140_001)
-        val cheer = shadowOf(incoming.actions[0].actionIntent).savedIntent
+        val cheer = chose(incoming, "Good job!")
         val data = AnkiquestReply.data(cheer, AnkiquestReply.message(cheer))
         assertEquals(account.notificationAccount, data.getString(AnkiquestReply.ACCOUNT_KEY))
         assertEquals(account.scope, data.getString(AnkiquestReply.SCOPE_KEY))
@@ -242,7 +253,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
             val choices = input.choices.map { it.toString() }
             val labels = notification.actions.map { it.title.toString() } + choices
             assertEquals(1, labels.count { it == "Good job!" }, "offer the quick cheer only once")
-            assertEquals(listOf("Nice one \uD83D\uDD25", "Keep it up!"), choices)
+            assertEquals(listOf("Good job!", "Nice one \uD83D\uDD25", "Keep it up!"), choices)
             assertTrue(input.allowFreeFormInput, "custom replies remain available")
             assertFalse(reply.allowGeneratedReplies, "Android must not add another quick cheer suggestion")
         }
@@ -295,7 +306,7 @@ class AnkiquestNotifierTest : RobolectricTest() {
         val failed = shadowOf(manager).getNotification(5_140_007)
         assertEquals(1, shadowOf(manager).size(), "the same notification is updated in place")
         assertEquals("Could not send \u201cGood job!\u201d. Tap a button to try again.", failed.extras.getString(Notification.EXTRA_TEXT))
-        assertEquals(listOf("Good job!", "Reply"), failed.actions.map { it.title.toString() })
+        assertEquals(listOf("Reply"), failed.actions.map { it.title.toString() })
     }
 
     @Test

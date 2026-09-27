@@ -44,7 +44,6 @@ object AnkiquestReply {
     const val MESSAGE_KEY = "message"
     const val ACCOUNT_KEY = "ankiquest.reply_account"
     const val SCOPE_KEY = "ankiquest.reply_scope"
-    const val QUICK_ACTION = "com.ichi2.anki.ankiquest.REPLY_QUICK"
     const val CUSTOM_ACTION = "com.ichi2.anki.ankiquest.REPLY_CUSTOM"
 
     const val ATTEMPTS = 3
@@ -52,7 +51,7 @@ object AnkiquestReply {
 
     private const val WORK_NAME = "ankiquestReply"
 
-    /** The cheer and the free text share one receiver, so both arrive as a plain message. */
+    /** One Reply action: its first suggestion is the one-tap answer, and free text is always allowed. */
     fun actions(
         context: Context,
         notification: Long,
@@ -72,59 +71,45 @@ object AnkiquestReply {
                 "nudge" -> AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_on_it)
                 else -> null
             }
-        val choices =
+        val suggestions =
             when (kind) {
                 "completion" -> AnkiquestLanguage.context(context).resources.getStringArray(R.array.ankiquest_reply_choices)
                 "reply" -> AnkiquestLanguage.context(context).resources.getStringArray(R.array.ankiquest_reply_thanks_choices)
                 "nudge" -> AnkiquestLanguage.context(context).resources.getStringArray(R.array.ankiquest_reply_nudge_choices)
                 else -> emptyArray()
             }
-        val intent = { action: String, message: String? ->
+        val choices = listOfNotNull(quick).toTypedArray<CharSequence>() + suggestions
+        val intent =
             Intent(context, AnkiquestReplyReceiver::class.java)
-                .setAction(action)
+                .setAction(CUSTOM_ACTION)
                 .putExtra(NOTIFICATION_KEY, notification)
                 .putExtra(TAG_KEY, tag)
                 .putExtra(TITLE_KEY, title)
                 .putExtra(BODY_KEY, body)
                 .putExtra(KIND_KEY, kind)
-                .putExtra(MESSAGE_KEY, message)
                 .putExtra(ACCOUNT_KEY, account)
                 .putExtra(SCOPE_KEY, scope)
-        }
-        val pending = { action: String, message: String?, mutable: Boolean ->
-            PendingIntent.getBroadcast(
-                context,
-                tag,
-                intent(action, message),
-                PendingIntent.FLAG_UPDATE_CURRENT or
-                    if (mutable) PendingIntent.FLAG_MUTABLE else PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
         val reply =
             RemoteInput
                 .Builder(MESSAGE_KEY)
                 .setLabel(AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_hint))
                 .setChoices(choices)
                 .build()
-        return buildList {
-            if (quick != null) {
-                add(
-                    NotificationCompat.Action
-                        .Builder(R.drawable.ic_star_notify, quick, pending(QUICK_ACTION, quick, false))
-                        .build(),
-                )
-            }
-            add(
-                NotificationCompat.Action
-                    .Builder(
-                        R.drawable.ic_star_notify,
-                        AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply),
-                        pending(CUSTOM_ACTION, null, true),
-                    ).addRemoteInput(reply)
-                    .setAllowGeneratedReplies(false)
-                    .build(),
-            )
-        }
+        return listOf(
+            NotificationCompat.Action
+                .Builder(
+                    R.drawable.ic_star_notify,
+                    AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply),
+                    PendingIntent.getBroadcast(
+                        context,
+                        tag,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+                    ),
+                ).addRemoteInput(reply)
+                .setAllowGeneratedReplies(false)
+                .build(),
+        )
     }
 
     fun send(
@@ -145,7 +130,7 @@ object AnkiquestReply {
         }
     }
 
-    /** The message as the receiver sees it: typed text wins, else the canned cheer. */
+    /** The chosen or typed text; notifications posted by older versions carry a cheer as an extra instead. */
     fun message(intent: Intent): String =
         (
             RemoteInput.getResultsFromIntent(intent)?.getCharSequence(MESSAGE_KEY)?.toString()
