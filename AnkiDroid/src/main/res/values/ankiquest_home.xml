@@ -88,6 +88,7 @@
     <string name="aq_home_inbox_legacy">This server provides recent messages only; unread tracking is unavailable.</string>
     <string name="aq_home_inbox_retention">Invitations and messages from the last 90 days.</string>
     <string name="aq_home_unread">Unread</string>
+    <string name="aq_home_mark_all_read">Mark all as read</string>
     <string name="aq_home_open_message">Open message</string>
     <string name="aq_home_reply">Reply</string>
     <string name="aq_home_reply_hint">A short reply</string>

@@ -480,6 +480,27 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         val inbox = remote?.inbox?.value
         if (inbox != null) {
             text(content, getString(if (inbox.modern) R.string.aq_home_inbox_retention else R.string.aq_home_inbox_legacy), small = true)
+            val through = inbox.items.maxOfOrNull { it.id }
+            if (inbox.modern && (inbox.unreadCount ?: 0) > 0 && through != null) {
+                button(content, R.string.aq_home_mark_all_read, enabled = remote?.inbox?.live == true && !saving && !loading) {
+                    mutate { captured ->
+                        repository.markAllRead(captured, through)
+                        if (captured.scope == AnkiquestHomeData.account()?.scope) {
+                            val current = remote?.inbox?.value ?: return@mutate
+                            remote =
+                                remote?.copy(
+                                    inbox =
+                                        HomeSection(
+                                            current.copy(
+                                                items = current.items.map { it.copy(unread = it.unread && it.id > through) },
+                                                unreadCount = current.items.count { it.unread && it.id > through },
+                                            ),
+                                        ),
+                                )
+                        }
+                    }
+                }
+            }
             if (inbox.items.isEmpty()) text(content, getString(R.string.aq_home_inbox_empty))
             inbox.items.forEach { notice ->
                 val row = card()

@@ -185,6 +185,17 @@ class AnkiquestHomeDataTest : RobolectricTest() {
         }
 
     @Test
+    fun `mark all read sends the last seen notification with owner credentials`() =
+        runBlocking {
+            repository.markAllRead(account, 23)
+            assertEquals("/api/activity/member%20name/read", requests.single().first)
+            assertEquals("Bearer secret", requests.single().second)
+            val body = JSONObject(bodies.single())
+            assertEquals(23L, body.getLong("through"))
+            assertFalse(body.has("ids"))
+        }
+
+    @Test
     fun `pagination preserves owner and exclusive cursor`() =
         runBlocking {
             repository.olderActivity(account, 123)

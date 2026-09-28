@@ -397,6 +397,14 @@ internal class HomeRepository(
         Unit
     }
 
+    suspend fun markAllRead(
+        account: HomeAccount,
+        through: Long,
+    ) = withContext(Dispatchers.IO) {
+        request(account, "api/activity/${account.encodedUser}/read", JSONObject().put("through", through))
+        Unit
+    }
+
     suspend fun reply(
         account: HomeAccount,
         id: Long,
