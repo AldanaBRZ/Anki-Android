@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_copies_title">Stapel mit Freunden</string>
+    <string name="aq_copies_description">Sende eine eigenständige Kopie mit Karten und Medien, ohne deinen Lernverlauf. Freunde entscheiden selbst, ob sie sie importieren.</string>
+    <string name="aq_copies_unavailable">Stapel können derzeit nicht geteilt werden. Prüfe die Verbindung und aktualisiere den Server.</string>
+    <string name="aq_copies_no_friends">Auf diesem Server sind noch keine Freunde verfügbar.</string>
+    <string name="aq_copies_none">Es warten keine Stapelkopien auf dich.</string>
+    <string name="aq_copies_received">Mit dir geteilt</string>
+    <string name="aq_copies_offer">%1$s hat %2$s geteilt</string>
+    <string name="aq_copies_share">Stapel teilen</string>
+    <string name="aq_copies_choose_deck">Stapel auswählen</string>
+    <string name="aq_copies_choose_friends">%1$s teilen mit</string>
+    <string name="aq_copies_choose_one">Wähle mindestens einen Freund aus.</string>
+    <string name="aq_copies_sending">Stapelkopie wird vorbereitet und gesendet…</string>
+    <string name="aq_copies_sent">Stapelkopie gesendet.</string>
+    <string name="aq_copies_import">Kopie importieren</string>
+    <string name="aq_copies_dismiss">Angebot entfernen</string>
+    <string name="aq_copies_downloading">Stapelkopie wird heruntergeladen…</string>
+    <string name="aq_copies_failed">Diese Aktion zum Teilen des Stapels konnte nicht abgeschlossen werden. Versuche es erneut.</string>
+    <string name="aq_copies_too_large">Diese Stapelkopie ist größer als 25 MB. Nutze für größere Stapel den normalen Anki-Export.</string>
+</resources>

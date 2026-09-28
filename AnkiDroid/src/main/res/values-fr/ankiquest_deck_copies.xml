@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_copies_title">Paquets entre amis</string>
+    <string name="aq_copies_description">Envoie une copie indépendante avec les cartes et les médias, sans ton historique de révision. Tes amis choisissent de l’importer ou non.</string>
+    <string name="aq_copies_unavailable">Le partage de paquets est indisponible. Vérifie ta connexion et mets le serveur à jour.</string>
+    <string name="aq_copies_no_friends">Aucun ami n’est encore disponible sur ce serveur.</string>
+    <string name="aq_copies_none">Aucune copie de paquet ne t’attend.</string>
+    <string name="aq_copies_received">Partagés avec toi</string>
+    <string name="aq_copies_offer">%1$s a partagé %2$s</string>
+    <string name="aq_copies_share">Partager un paquet</string>
+    <string name="aq_copies_choose_deck">Choisis un paquet</string>
+    <string name="aq_copies_choose_friends">Partager %1$s avec</string>
+    <string name="aq_copies_choose_one">Choisis au moins un ami.</string>
+    <string name="aq_copies_sending">Préparation et envoi de la copie…</string>
+    <string name="aq_copies_sent">Copie du paquet envoyée.</string>
+    <string name="aq_copies_import">Importer une copie</string>
+    <string name="aq_copies_dismiss">Supprimer l’offre</string>
+    <string name="aq_copies_downloading">Téléchargement de la copie…</string>
+    <string name="aq_copies_failed">Impossible de terminer cette action de partage. Réessaie.</string>
+    <string name="aq_copies_too_large">Cette copie dépasse 25 Mo. Utilise l’exportation normale d’Anki pour les paquets plus volumineux.</string>
+</resources>

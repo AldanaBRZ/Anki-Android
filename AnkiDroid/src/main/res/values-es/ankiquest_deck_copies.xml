@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_copies_title">Mazos con amigos</string>
+    <string name="aq_copies_description">Envía una copia independiente con tarjetas y archivos multimedia, sin tu historial de estudio. Tus amigos deciden si la importan.</string>
+    <string name="aq_copies_unavailable">No se pueden compartir mazos. Comprueba la conexión y actualiza el servidor.</string>
+    <string name="aq_copies_no_friends">Todavía no hay amigos disponibles en este servidor.</string>
+    <string name="aq_copies_none">No tienes copias de mazos pendientes.</string>
+    <string name="aq_copies_received">Compartidos contigo</string>
+    <string name="aq_copies_offer">%1$s compartió %2$s</string>
+    <string name="aq_copies_share">Compartir un mazo</string>
+    <string name="aq_copies_choose_deck">Elige un mazo</string>
+    <string name="aq_copies_choose_friends">Compartir %1$s con</string>
+    <string name="aq_copies_choose_one">Elige al menos un amigo.</string>
+    <string name="aq_copies_sending">Preparando y enviando la copia del mazo…</string>
+    <string name="aq_copies_sent">Copia del mazo enviada.</string>
+    <string name="aq_copies_import">Importar una copia</string>
+    <string name="aq_copies_dismiss">Eliminar oferta</string>
+    <string name="aq_copies_downloading">Descargando la copia del mazo…</string>
+    <string name="aq_copies_failed">No se pudo completar esta acción para compartir mazos. Inténtalo de nuevo.</string>
+    <string name="aq_copies_too_large">Esta copia supera los 25 MB. Usa la exportación normal de Anki para mazos más grandes.</string>
+</resources>
