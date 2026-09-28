@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_deck_later">Apprentissage plus tard aujourd’hui · prochaine révision à %1$s</string>
+    <string name="aq_deck_done">Terminé pour aujourd’hui</string>
+    <string name="aq_deck_nothing">Rien de prévu aujourd’hui</string>
+    <plurals name="aq_deck_ready">
+        <item quantity="one">%d carte prête</item>
+        <item quantity="other">%d cartes prêtes</item>
+    </plurals>
+</resources>

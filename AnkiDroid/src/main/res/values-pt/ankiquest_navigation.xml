@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ankiquest_nav_today">Hoje</string>
+    <string name="ankiquest_nav_friends">Amigos</string>
+    <string name="ankiquest_nav_progress">Progresso</string>
+    <string name="ankiquest_nav_decks">Baralhos</string>
+    <string name="ankiquest_open_today_title">Abrir Hoje ao iniciar</string>
+    <string name="ankiquest_open_today_summary">Começa com o estudo e os objetivos dos amigos. Desativa para abrir a biblioteca de baralhos.</string>
+    <string name="ankiquest_summary_title">A tua sessão de estudo</string>
+    <string name="ankiquest_summary_body">%1$d revisões · %2$s\n%3$d cartões ainda disponíveis neste baralho.\n\nGuardado neste dispositivo. O progresso partilhado é atualizado após o envio.</string>
+    <string name="ankiquest_summary_under_minute">menos de um minuto</string>
+    <plurals name="ankiquest_summary_minutes">
+        <item quantity="one">%d minuto</item>
+        <item quantity="other">%d minutos</item>
+    </plurals>
+    <string name="ankiquest_summary_continue">Continuar a estudar</string>
+    <string name="ankiquest_summary_progress">Ver progresso</string>
+    <string name="ankiquest_summary_preference_title">Resumo da sessão</string>
+    <string name="ankiquest_summary_preference_summary">Mostra um resumo discreto e acessível quando terminas uma sessão de estudo.</string>
+    <string name="ankiquest_missing_deck">Este baralho já não está disponível. Escolhe outro.</string>
+    <string name="ankiquest_deck_ready_later">Não há cartões prontos neste baralho agora. Escolhe outro ou volta mais tarde.</string>
+</resources>
