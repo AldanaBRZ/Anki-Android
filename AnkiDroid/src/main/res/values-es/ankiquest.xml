@@ -4,7 +4,7 @@
     <string name="ankiquest_community_reminders_title">Recordatorios de la comunidad</string>
     <string name="ankiquest_community_reminders_summary">Elige recordatorios de eventos de la comunidad</string>
     <string name="ankiquest_streak_protection_title">Protección de racha</string>
-    <string name="ankiquest_streak_protection_summary">Desactivada inicialmente. Al activarla, completa las tres misiones diarias para ganar un protector por día de Anki, hasta 3. Se usa uno automáticamente por cada día terminado sin repasos. Desactivarla pausa su obtención y uso; conservas los protectores guardados.</string>
+    <string name="ankiquest_streak_protection_summary">Activada inicialmente. Completa las tres misiones diarias mientras la protección esté activada para ganar un protector por día de Anki, hasta 3. Se usa uno automáticamente por cada día terminado sin repasos. Desactivarla pausa su obtención y uso; conservas los protectores guardados.</string>
     <string name="ankiquest_avatar_title">Foto de perfil</string>
     <string name="ankiquest_avatar_summary">Elige una foto para tu perfil, clasificación y widgets</string>
     <string name="ankiquest_avatar_choose">Elegir foto</string>
