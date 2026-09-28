@@ -38,6 +38,7 @@ class LicenseHeaderExists :
          * - `GPL-3.0-or-later`
          * - `LGPL-3.0-or-later`
          * - `Apache-2.0`
+         * - `AGPL-3.0-only`, the AnkiQuest code; GPLv3 section 13 allows combining it with GPLv3 code
          *
          *  e.g. `// SPDX-License-Identifier: GPL-3.0-or-later`.
          *
@@ -50,6 +51,8 @@ class LicenseHeaderExists :
                     "L?GPL-3\\.0-or-later" +
                     // or Apache-2.0
                     "|Apache-2\\.0" +
+                    // or AGPL-3.0-only
+                    "|AGPL-3\\.0-only" +
                     ")",
             )
 

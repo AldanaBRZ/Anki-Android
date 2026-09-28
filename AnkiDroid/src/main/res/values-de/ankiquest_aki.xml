@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
     <string name="aki_welcome">Aki hilft dir. Eine Karte, ein kleiner Schritt.</string>
     <string name="aki_review">Ein kleiner Schritt beginnt mit einer Karte.</string>

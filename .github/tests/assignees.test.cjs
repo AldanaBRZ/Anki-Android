@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-License-Identifier: GPL-3.0-or-later
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
     <color name="aq_deck_amber">#F0BC57</color>
     <color name="aq_deck_green">#8CD79E</color>

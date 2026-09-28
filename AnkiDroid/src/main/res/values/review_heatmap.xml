@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
     <string name="review_heatmap_title">Review heatmap</string>
     <string name="review_heatmap_subtitle">Your collection, one day at a time</string>

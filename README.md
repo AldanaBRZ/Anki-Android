@@ -78,6 +78,7 @@ Thanks to our 1400 translators, for allowing us to be available, partially or to
 
 License
 -------
-* [GPL-3.0 License](https://github.com/float3/AnkiQuest-Android/blob/ankiquest/COPYING)
+* [GPL-3.0 License](https://github.com/float3/AnkiQuest-Android/blob/ankiquest/COPYING) for AnkiDroid, including the AnkiDroid files this fork modifies
+* [AGPL-3.0 License](https://github.com/float3/AnkiQuest-Android/blob/ankiquest/LICENSES/AGPL-3.0-only.txt) for the AnkiQuest code: every file marked `SPDX-License-Identifier: AGPL-3.0-only`, plus `docs/branding/`, `docs/review-heatmap.md`, the `aki_*.png` artwork, `AnkiDroid/src/test/resources/ankiquest/`, `.github/ankiquest-release.md` and `tools/ankiquest-signing-lineage.bin`. As GPLv3 section 13 allows, the app combines both, and the AGPL's network-interaction terms apply to the combined work
 * [AGPL-3.0 License](https://github.com/ankitects/anki/blob/main/LICENSE) for some part of the back-end
 * [LGPL-3.0 License](https://github.com/float3/AnkiQuest-Android/blob/ankiquest/api/COPYING.LESSER) for the AnkiDroid API
