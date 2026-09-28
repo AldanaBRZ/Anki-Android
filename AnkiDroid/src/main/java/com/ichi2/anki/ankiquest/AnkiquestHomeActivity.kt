@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorRes
 import androidx.annotation.StringRes
 import androidx.core.view.ViewCompat
@@ -29,6 +30,7 @@ import com.ichi2.anki.AnkiActivity
 import com.ichi2.anki.CollectionManager
 import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
+import com.ichi2.anki.pages.AnkiPackageImporterFragment
 import com.ichi2.anki.preferences.AnkiquestSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
 import kotlinx.coroutines.CancellationException
@@ -36,6 +38,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import timber.log.Timber
+import java.io.File
 import java.io.IOException
 
 /**
@@ -53,6 +56,18 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
     @StringRes private var profileFailure: Int? = null
     private var loading = false
     private var networkJob: Job? = null
+    private var copyJob: Job? = null
+    private var copyInbox: JSONObject? = null
+    private var copyFailed = false
+    private var copyBusy = false
+    private var copyStatus: String? = null
+    private var importedCopyFile: File? = null
+    private val copyImporter =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            importedCopyFile?.delete()
+            importedCopyFile = null
+            refresh()
+        }
     private var generation = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -121,6 +136,9 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             account = current
             profile = null
             profileFailure = null
+            copyInbox = null
+            copyStatus = null
+            copyBusy = false
         }
         val turn = ++generation
         lifecycleScope.launch {
@@ -143,6 +161,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             }
         }
         networkJob?.cancel()
+        copyJob?.cancel()
         if (current == null) {
             loading = false
             render()
@@ -150,6 +169,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         }
         loading = true
         render()
+        refreshCopies(current, turn)
         networkJob =
             lifecycleScope.launch {
                 val failure =
@@ -170,6 +190,30 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                     profileFailure = failure
                     if (failure == R.string.aq_home_auth) profile = null
                     loading = false
+                    render()
+                }
+            }
+    }
+
+    private fun refreshCopies(
+        current: HomeAccount,
+        turn: Int = generation,
+    ) {
+        copyJob?.cancel()
+        copyJob =
+            lifecycleScope.launch {
+                val result =
+                    try {
+                        AnkiquestDeckCopies.inbox(current)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        Timber.w(error, "AnkiQuest deck copies could not be loaded")
+                        null
+                    }
+                if (turn == generation && account?.scope == current.scope) {
+                    copyInbox = result
+                    copyFailed = result == null
                     render()
                 }
             }
@@ -222,6 +266,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             }
         }
         if (account == null) connectionCard()
+        if (account != null) renderDeckCopies()
         AnkiquestStudySession.latest()?.let { summary ->
             val panel = card()
             panel.addView(AnkiquestAki.image(this, if (summary.remaining == 0) R.drawable.aki_celebrate else R.drawable.aki_streak, 56))
@@ -245,6 +290,152 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             if (failure == R.string.aq_home_auth) button(content, R.string.aq_home_settings) { settings() }
         }
         if (account != null) button(content, R.string.aq_home_retry, enabled = !loading) { refresh() }
+    }
+
+    private fun renderDeckCopies() {
+        val panel = card()
+        text(panel, getString(R.string.aq_copies_title), heading = true)
+        text(panel, getString(R.string.aq_copies_description), small = true)
+        copyStatus?.let { text(panel, it, small = true) }
+        val data = copyInbox
+        if (data == null) {
+            text(panel, getString(if (copyFailed) R.string.aq_copies_unavailable else R.string.aq_home_loading_local), small = true)
+            return
+        }
+        val friends = data.optJSONArray("friends")?.objects().orEmpty()
+        val decks = local?.decks.orEmpty()
+        button(panel, R.string.aq_copies_share, enabled = !copyBusy && friends.isNotEmpty() && decks.isNotEmpty()) {
+            chooseDeckForCopy(decks, friends)
+        }
+        if (friends.isEmpty()) text(panel, getString(R.string.aq_copies_no_friends), small = true)
+        val offers = data.optJSONArray("offers")?.objects().orEmpty()
+        if (offers.isEmpty()) {
+            text(panel, getString(R.string.aq_copies_none), small = true)
+        } else {
+            text(panel, getString(R.string.aq_copies_received), heading = true)
+            for (offer in offers) {
+                val sender = offer.optString("sender")
+                val display = friends.firstOrNull { it.optString("user") == sender }?.optString("display") ?: sender
+                text(panel, getString(R.string.aq_copies_offer, display, offer.optString("deck")))
+                val id = offer.optLong("id")
+                button(panel, R.string.aq_copies_import, enabled = !copyBusy) { importCopy(id) }
+                button(panel, R.string.aq_copies_dismiss, enabled = !copyBusy) { dismissCopy(id) }
+            }
+        }
+    }
+
+    private fun chooseDeckForCopy(
+        decks: List<HomeDeck>,
+        friends: List<JSONObject>,
+    ) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.aq_copies_choose_deck)
+            .setItems(decks.map { it.name }.toTypedArray()) { _, position -> chooseFriendsForCopy(decks[position], friends) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun chooseFriendsForCopy(
+        deck: HomeDeck,
+        friends: List<JSONObject>,
+    ) {
+        val picked = BooleanArray(friends.size)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.aq_copies_choose_friends, deck.name))
+            .setMultiChoiceItems(friends.map { it.optString("display") }.toTypedArray(), picked) { _, which, selected ->
+                picked[which] = selected
+            }.setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.aq_copies_share) { _, _ ->
+                val selected = friends.indices.filter { picked[it] }.map { friends[it].getString("user") }
+                if (selected.isEmpty()) {
+                    copyStatus = getString(R.string.aq_copies_choose_one)
+                    render()
+                } else {
+                    shareCopy(deck, selected)
+                }
+            }.show()
+    }
+
+    private fun shareCopy(
+        deck: HomeDeck,
+        recipients: List<String>,
+    ) {
+        val current = account ?: return
+        copyBusy = true
+        copyStatus = getString(R.string.aq_copies_sending)
+        render()
+        lifecycleScope.launch {
+            val status =
+                try {
+                    AnkiquestDeckCopies.share(current, deck.id, deck.name, recipients, cacheDir)
+                    getString(R.string.aq_copies_sent)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: AnkiquestDeckCopies.TooLarge) {
+                    getString(R.string.aq_copies_too_large)
+                } catch (error: Exception) {
+                    Timber.w(error, "AnkiQuest deck copy could not be sent")
+                    getString(R.string.aq_copies_failed)
+                }
+            if (account?.scope == current.scope) {
+                copyStatus = status
+                copyBusy = false
+                render()
+            }
+        }
+    }
+
+    private fun importCopy(id: Long) {
+        val current = account ?: return
+        copyBusy = true
+        copyStatus = getString(R.string.aq_copies_downloading)
+        render()
+        lifecycleScope.launch {
+            try {
+                val file = AnkiquestDeckCopies.download(current, id, cacheDir)
+                if (account?.scope == current.scope) {
+                    copyStatus = null
+                    importedCopyFile = file
+                    copyImporter.launch(AnkiPackageImporterFragment.getIntent(this@AnkiquestHomeActivity, file.absolutePath))
+                } else {
+                    file.delete()
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Timber.w(error, "AnkiQuest deck copy could not be imported")
+                if (account?.scope == current.scope) copyStatus = getString(R.string.aq_copies_failed)
+            }
+            if (account?.scope == current.scope) {
+                copyBusy = false
+                render()
+            }
+        }
+    }
+
+    private fun dismissCopy(id: Long) {
+        val current = account ?: return
+        copyBusy = true
+        render()
+        lifecycleScope.launch {
+            try {
+                AnkiquestDeckCopies.dismiss(current, id)
+                if (account?.scope == current.scope) {
+                    copyStatus = null
+                    copyBusy = false
+                    refreshCopies(current)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Timber.w(error, "AnkiQuest deck copy could not be dismissed")
+                if (account?.scope == current.scope) {
+                    copyStatus = getString(R.string.aq_copies_failed)
+                    copyBusy = false
+                    render()
+                }
+            }
+        }
     }
 
     private fun chooseDeck() {

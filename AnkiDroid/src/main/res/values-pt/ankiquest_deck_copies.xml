@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_copies_title">Baralhos com amigos</string>
+    <string name="aq_copies_description">Envia uma cópia independente com cartões e multimédia, sem o teu histórico de estudo. Os amigos decidem se a importam.</string>
+    <string name="aq_copies_unavailable">A partilha de baralhos não está disponível. Verifica a ligação e atualiza o servidor.</string>
+    <string name="aq_copies_no_friends">Ainda não há amigos disponíveis neste servidor.</string>
+    <string name="aq_copies_none">Não há cópias de baralhos à tua espera.</string>
+    <string name="aq_copies_received">Partilhados contigo</string>
+    <string name="aq_copies_offer">%1$s partilhou %2$s</string>
+    <string name="aq_copies_share">Partilhar um baralho</string>
+    <string name="aq_copies_choose_deck">Escolhe um baralho</string>
+    <string name="aq_copies_choose_friends">Partilhar %1$s com</string>
+    <string name="aq_copies_choose_one">Escolhe pelo menos um amigo.</string>
+    <string name="aq_copies_sending">A preparar e enviar a cópia do baralho…</string>
+    <string name="aq_copies_sent">Cópia do baralho enviada.</string>
+    <string name="aq_copies_import">Importar uma cópia</string>
+    <string name="aq_copies_dismiss">Remover oferta</string>
+    <string name="aq_copies_downloading">A transferir a cópia do baralho…</string>
+    <string name="aq_copies_failed">Não foi possível concluir esta ação de partilha. Tenta novamente.</string>
+    <string name="aq_copies_too_large">Esta cópia ultrapassa 25 MB. Usa a exportação normal do Anki para baralhos maiores.</string>
+</resources>

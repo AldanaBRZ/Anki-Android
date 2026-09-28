@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_copies_title">Decks with friends</string>
+    <string name="aq_copies_description">Send an independent copy with cards and media, without your study history. Friends choose whether to import it.</string>
+    <string name="aq_copies_unavailable">Deck sharing is unavailable. Check your connection and update the server.</string>
+    <string name="aq_copies_no_friends">No friends are available on this server yet.</string>
+    <string name="aq_copies_none">No deck copies are waiting for you.</string>
+    <string name="aq_copies_received">Shared with you</string>
+    <string name="aq_copies_offer">%1$s shared %2$s</string>
+    <string name="aq_copies_share">Share a deck</string>
+    <string name="aq_copies_choose_deck">Choose a deck</string>
+    <string name="aq_copies_choose_friends">Share %1$s with</string>
+    <string name="aq_copies_choose_one">Choose at least one friend.</string>
+    <string name="aq_copies_sending">Preparing and sending the deck copy…</string>
+    <string name="aq_copies_sent">Deck copy sent.</string>
+    <string name="aq_copies_import">Import a copy</string>
+    <string name="aq_copies_dismiss">Remove offer</string>
+    <string name="aq_copies_downloading">Downloading the deck copy…</string>
+    <string name="aq_copies_failed">Could not complete this deck-sharing action. Try again.</string>
+    <string name="aq_copies_too_large">This deck copy is over 25 MB. Use Anki’s normal export to share larger decks.</string>
+</resources>
