@@ -13,7 +13,9 @@ import com.ichi2.testutils.EmptyApplication
 import com.sun.net.httpserver.HttpServer
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.asContextElement
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -115,37 +117,43 @@ class AnkiquestPrivateAccessTest : RobolectricTest() {
             assertTrue(requests.all { it.authorization == null })
         }
 
+    private val readingUnderTest = ThreadLocal<Boolean>()
+
     private fun switchServerDuringSettingsRead() {
         val preferences = targetContext.sharedPrefs()
         val changingPreferences = mockk<SharedPreferences>()
-        val originalSettings = preferences.all
-        val originalUrl = preferences.getString(Ankiquest.URL_KEY, "")
 
-        fun switchServer() {
-            preferences.edit {
-                putString(Ankiquest.URL_KEY, "https://private.example.test")
-                putString(Ankiquest.TOKEN_KEY, "new-private-secret")
+        fun <T> switchServerAfter(read: () -> T): T {
+            val captured = read()
+            if (readingUnderTest.get() == true) {
+                preferences.edit {
+                    putString(Ankiquest.URL_KEY, "https://private.example.test")
+                    putString(Ankiquest.TOKEN_KEY, "new-private-secret")
+                }
             }
+            return captured
         }
         every { changingPreferences.getString(any(), any()) } answers { preferences.getString(firstArg(), secondArg()) }
         every { changingPreferences.getString(Ankiquest.URL_KEY, "") } answers {
-            switchServer()
-            originalUrl
+            switchServerAfter { preferences.getString(Ankiquest.URL_KEY, "") }
         }
-        every { changingPreferences.all } answers {
-            switchServer()
-            originalSettings
-        }
+        every { changingPreferences.all } answers { switchServerAfter { preferences.all } }
         AnkiDroidApp.sharedPreferencesTestingOverride = changingPreferences
     }
+
+    private suspend fun <T> readingSettings(block: suspend () -> T): T = withContext(readingUnderTest.asContextElement(true)) { block() }
+
+    private fun assertServerSwitched() =
+        assertEquals("https://private.example.test", targetContext.sharedPrefs().getString(Ankiquest.URL_KEY, ""))
 
     @Test
     fun `account changes never send new server credentials to the captured server`() =
         runBlocking {
             switchServerDuringSettingsRead()
 
-            Ankiquest.profile()
+            readingSettings { Ankiquest.profile() }
 
+            assertServerSwitched()
             assertTrue(requests.any { it.path == "/api/profile/member%20name" })
             assertTrue(requests.filter { it.path == "/api/profile/member%20name" }.all { it.authorization == "Bearer member-secret" })
             assertTrue(requests.none { it.authorization == "Bearer new-private-secret" })
@@ -157,8 +165,9 @@ class AnkiquestPrivateAccessTest : RobolectricTest() {
             AnkiDroidApp.sharedPrefs().edit { remove(Ankiquest.TOKEN_KEY) }
             switchServerDuringSettingsRead()
 
-            Ankiquest.runFromSettings(targetContext, uploadAll = false)
+            readingSettings { Ankiquest.runFromSettings(targetContext, uploadAll = false) }
 
+            assertServerSwitched()
             assertTrue(requests.any { it.path == "/api/profile/member%20name" })
             assertTrue(requests.all { it.authorization == null })
         }
