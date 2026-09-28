@@ -6,7 +6,9 @@
     <Preference
         android:key="@string/ankiquest_dashboard_key"
         android:persistent="false"
-        android:title="@string/ankiquest_dashboard_title" />
+        android:title="@string/ankiquest_dashboard_title"
+        android:icon="@drawable/aki_face"
+        android:summary="@string/aki_settings_summary" />
     <com.ichi2.preferences.VersatileTextPreference
         android:key="@string/ankiquest_url_key"
         android:title="@string/ankiquest_url_title"
