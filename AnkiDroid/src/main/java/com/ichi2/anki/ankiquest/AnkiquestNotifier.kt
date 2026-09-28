@@ -315,7 +315,8 @@ object AnkiquestNotifier {
         val notification =
             NotificationCompat
                 .Builder(context, channel)
-                .setSmallIcon(R.drawable.ic_star_notify)
+                .setSmallIcon(R.drawable.ic_aki_notify)
+                .setLargeIcon(AnkiquestAki.notificationIcon(context))
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))

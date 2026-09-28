@@ -6,7 +6,9 @@
     <Preference
         android:key="@string/ankiquest_dashboard_key"
         android:persistent="false"
-        android:title="@string/ankiquest_dashboard_title" />
+        android:title="@string/ankiquest_dashboard_title"
+        android:icon="@drawable/aki_face"
+        android:summary="@string/aki_settings_summary" />
     <com.ichi2.preferences.VersatileTextPreference
         android:key="@string/ankiquest_url_key"
         android:title="@string/ankiquest_url_title"
@@ -53,6 +55,10 @@
         android:key="@string/ankiquest_nudges_key"
         android:summary="@string/ankiquest_nudges_summary"
         android:title="@string/ankiquest_nudges_title" />
+    <SwitchPreferenceCompat
+        android:key="@string/ankiquest_celebrations_key"
+        android:summary="@string/ankiquest_celebrations_summary"
+        android:title="@string/ankiquest_celebrations_title" />
     <SwitchPreferenceCompat
         android:key="@string/ankiquest_streak_protection_key"
         android:persistent="false"

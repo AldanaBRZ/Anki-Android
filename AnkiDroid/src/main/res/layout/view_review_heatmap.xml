@@ -40,6 +40,14 @@
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?android:attr/textColorSecondary" />
                 </LinearLayout>
+                <ImageView
+                    android:id="@+id/review_heatmap_aki"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:importantForAccessibility="no"
+                    android:background="@null"
+                    android:visibility="gone"
+                    android:src="@drawable/aki_streak" />
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/review_heatmap_collapse"
                     android:layout_width="48dp"
