@@ -22,7 +22,7 @@ internal object AnkiquestAki {
         @DrawableRes val image: Int,
         @StringRes val message: Int,
     ) {
-        WELCOME(R.drawable.aki_welcome, R.string.aki_welcome),
+        WELCOME(R.drawable.aki_welcome, R.string.aki_review),
         REVIEW(R.drawable.aki_review, R.string.aki_review),
         CELEBRATE(R.drawable.aki_celebrate, R.string.aki_complete),
         STREAK(R.drawable.aki_streak, R.string.aki_streak),
@@ -60,7 +60,7 @@ internal object AnkiquestAki {
         size: Int = 80,
     ): ImageView =
         ImageView(context).apply {
-            setImageResource(resource)
+            AnkiquestCompanion.show(this, resource)
             scaleType = ImageView.ScaleType.FIT_CENTER
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             layoutParams = LinearLayout.LayoutParams(dp(context, size), dp(context, size))
@@ -71,6 +71,7 @@ internal object AnkiquestAki {
         mood: Mood,
     ): LinearLayout =
         LinearLayout(context).apply {
+            visibility = if (AnkiquestCompanion.visible()) View.VISIBLE else View.GONE
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(context, 8), 0, dp(context, 8))
@@ -87,11 +88,15 @@ internal object AnkiquestAki {
         }
 
     fun notificationIcon(context: Context): Bitmap? =
-        BitmapFactory.decodeResource(
-            context.resources,
-            R.drawable.aki_face,
-            BitmapFactory.Options().apply { inSampleSize = 8 },
-        )
+        if (!AnkiquestCompanion.visible()) {
+            null
+        } else {
+            BitmapFactory.decodeResource(
+                context.resources,
+                AnkiquestCompanion.resource(R.drawable.aki_face),
+                BitmapFactory.Options().apply { inSampleSize = 8 },
+            )
+        }
 
     private fun dp(
         context: Context,

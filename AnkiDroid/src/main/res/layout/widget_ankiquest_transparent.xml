@@ -19,6 +19,7 @@
         android:paddingBottom="4dp">
 
         <ImageView
+            android:id="@+id/ankiquest_widget_companion"
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:layout_marginEnd="6dp"

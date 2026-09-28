@@ -24,12 +24,15 @@ import com.ichi2.anki.ankiquest.Ankiquest
 import com.ichi2.anki.ankiquest.AnkiquestActivity
 import com.ichi2.anki.ankiquest.AnkiquestAvatarEditor
 import com.ichi2.anki.ankiquest.AnkiquestAvatars
+import com.ichi2.anki.ankiquest.AnkiquestCompanion
 import com.ichi2.anki.ankiquest.AnkiquestDeckAdapter
 import com.ichi2.anki.ankiquest.AnkiquestDeckTree
+import com.ichi2.anki.ankiquest.AnkiquestHomeData
 import com.ichi2.anki.ankiquest.AnkiquestNotificationHealth
 import com.ichi2.anki.ankiquest.AnkiquestNotifier
 import com.ichi2.anki.ankiquest.AnkiquestPoll
 import com.ichi2.anki.ankiquest.AnkiquestUpdater
+import com.ichi2.anki.ankiquest.AnkiquestWidget
 import com.ichi2.preferences.VersatileTextPreference
 import com.ichi2.utils.Permissions.openAppSettingsScreen
 import kotlinx.coroutines.CancellationException
@@ -76,6 +79,7 @@ open class AnkiquestSettingsFragment : SettingsFragment() {
     override fun initSubscreen() {
         refreshServerSettings.clear()
         bindDashboard(R.string.ankiquest_dashboard_key)
+        updateCompanionIcon()
     }
 
     protected fun bindAccount() {
@@ -83,6 +87,7 @@ open class AnkiquestSettingsFragment : SettingsFragment() {
             VersatileTextPreference.Validator { value ->
                 if (value.isNotEmpty()) value.toHttpUrl()
             }
+        bindCompanion()
         requirePreference<Preference>(R.string.ankiquest_avatar_key).setOnPreferenceClickListener {
             pictureAction {
                 val account = checkNotNull(AnkiquestAvatars.account()) { getString(R.string.ankiquest_nudges_unavailable) }
@@ -207,6 +212,97 @@ open class AnkiquestSettingsFragment : SettingsFragment() {
                 preference.isEnabled = true
             }
         }
+    }
+
+    private fun updateCompanionIcon() {
+        preferenceScreen.findPreference<Preference>(getString(R.string.ankiquest_dashboard_key))?.icon =
+            if (AnkiquestCompanion.visible()) {
+                ContextCompat.getDrawable(requireContext(), AnkiquestCompanion.resource(R.drawable.aki_face))
+            } else {
+                null
+            }
+    }
+
+    private fun bindCompanion() {
+        val preference = requirePreference<ListPreference>(R.string.ankiquest_companion_key)
+        var generation = 0
+        var saving = false
+        var refreshPending = false
+        preference.isPersistent = false
+        preference.isEnabled = false
+        val refresh = refresh@{
+            val request = ++generation
+            preference.isEnabled = false
+            val account = AnkiquestHomeData.account()?.takeIf { it.token.isNotEmpty() }
+            if (account == null) {
+                preference.summary = getString(R.string.ankiquest_check_unconfigured)
+                return@refresh
+            }
+            preference.summary = getString(R.string.ankiquest_check_running)
+            if (saving) {
+                refreshPending = true
+                return@refresh
+            }
+            lifecycleScope.launch {
+                try {
+                    val choice = AnkiquestHomeData.companion(account)
+                    if (request != generation || AnkiquestHomeData.account()?.scope != account.scope || !isAdded) return@launch
+                    AnkiquestCompanion.remember(account, choice)
+                    preference.value = choice
+                    preference.summary = preference.entry
+                    preference.isEnabled = true
+                    updateCompanionIcon()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (request == generation &&
+                        isAdded
+                    ) {
+                        preference.summary = getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName)
+                    }
+                }
+            }
+        }
+        refreshServerSettings.add { refresh() }
+        preference.setOnPreferenceChangeListener { _, value ->
+            val account = AnkiquestHomeData.account() ?: return@setOnPreferenceChangeListener false
+            val request = ++generation
+            saving = true
+            preference.isEnabled = false
+            lifecycleScope.launch {
+                try {
+                    val choice = AnkiquestHomeData.saveCompanion(account, value.toString())
+                    if (request != generation || AnkiquestHomeData.account()?.scope != account.scope || !isAdded) return@launch
+                    AnkiquestCompanion.remember(account, choice)
+                    preference.value = choice
+                    preference.summary = preference.entry
+                    preference.isEnabled = true
+                    updateCompanionIcon()
+                    AnkiquestWidget.requestUpdate(requireContext())
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (request == generation && isAdded) {
+                        AlertDialog
+                            .Builder(requireContext())
+                            .setTitle(preference.title)
+                            .setMessage(getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName))
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                } finally {
+                    saving = false
+                    if (refreshPending && isAdded) {
+                        refreshPending = false
+                        refresh()
+                    } else if (request == generation && isAdded && !preference.isEnabled) {
+                        refresh()
+                    }
+                }
+            }
+            false
+        }
+        updateCompanionIcon()
     }
 
     private fun bindAlertSettings(
@@ -578,6 +674,7 @@ open class AnkiquestSettingsFragment : SettingsFragment() {
 
     override fun onResume() {
         super.onResume()
+        updateCompanionIcon()
         refreshServerSettings.forEach { it() }
         // Deliver pending messages promptly after returning from Android alert settings.
         AnkiquestPoll.refreshNow(requireContext())

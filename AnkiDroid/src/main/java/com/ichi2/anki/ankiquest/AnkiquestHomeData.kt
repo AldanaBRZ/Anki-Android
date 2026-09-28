@@ -9,8 +9,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -107,6 +109,38 @@ internal object AnkiquestHomeData {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw Ankiquest.HttpStatusException(response.code)
                 JSONObject(response.body.string())
+            }
+        }
+
+    suspend fun companion(account: HomeAccount): String = companionRequest(account, null)
+
+    suspend fun saveCompanion(
+        account: HomeAccount,
+        choice: String,
+    ): String {
+        require(AnkiquestCompanion.normalize(choice) == choice)
+        return companionRequest(account, choice)
+    }
+
+    private suspend fun companionRequest(
+        account: HomeAccount,
+        choice: String?,
+    ): String =
+        withContext(Dispatchers.IO) {
+            check(account.token.isNotEmpty()) { "Set your AnkiQuest token to choose a companion." }
+            val request =
+                Request
+                    .Builder()
+                    .url(account.url("api/companion/${account.encodedUser}"))
+                    .header("Authorization", "Bearer ${account.token}")
+                    .apply {
+                        if (choice != null) {
+                            post(JSONObject().put("companion", choice).toString().toRequestBody("application/json".toMediaType()))
+                        }
+                    }.build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw Ankiquest.HttpStatusException(response.code)
+                AnkiquestCompanion.normalize(JSONObject(response.body.string()).getString("companion"))
             }
         }
 

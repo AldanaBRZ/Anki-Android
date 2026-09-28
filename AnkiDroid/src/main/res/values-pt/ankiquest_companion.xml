@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="ankiquest_companion_title">Companheiro de estudo</string>
+    <string name="ankiquest_companion_summary">Escolhe Aki, Ankilope ou nenhum companheiro. Sincronizado em todos os dispositivos.</string>
+    <string name="ankiquest_companion_none">Sem companheiro</string>
+</resources>
