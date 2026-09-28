@@ -24,6 +24,13 @@
         android:persistent="false"
         android:title="@string/ankiquest_avatar_title"
         android:summary="@string/ankiquest_avatar_summary" />
+    <ListPreference
+        android:key="@string/ankiquest_companion_key"
+        android:persistent="false"
+        android:entries="@array/ankiquest_companion_entries"
+        android:entryValues="@array/ankiquest_companion_values"
+        android:title="@string/ankiquest_companion_title"
+        android:summary="@string/ankiquest_companion_summary" />
     <Preference
         android:key="@string/ankiquest_test_key"
         android:title="@string/ankiquest_test_title"

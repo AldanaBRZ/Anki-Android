@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -176,6 +177,20 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                     try {
                         val result = AnkiquestHomeData.profile(current)
                         if (turn == generation && AnkiquestHomeData.account()?.scope == current.scope) profile = result
+                        if (current.token.isNotEmpty()) {
+                            try {
+                                val companion = AnkiquestHomeData.companion(current)
+                                if (turn == generation && AnkiquestHomeData.account()?.scope == current.scope &&
+                                    AnkiquestCompanion.selected() != companion && AnkiquestCompanion.remember(current, companion)
+                                ) {
+                                    AnkiquestWidget.requestUpdate(this@AnkiquestHomeActivity)
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Timber.w(e, "AnkiQuest companion could not be refreshed")
+                            }
+                        }
                         null
                     } catch (e: CancellationException) {
                         throw e
@@ -223,6 +238,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         if (!::content.isInitialized) return
         val position = scroll.scrollY
         content.removeAllViews()
+        AnkiquestCompanion.show(findViewById<ImageView>(R.id.aq_home_companion), R.drawable.aki_face)
         findViewById<View>(R.id.aq_home_loading).isVisible = loading
         renderToday()
         scroll.post { scroll.scrollTo(0, position) }

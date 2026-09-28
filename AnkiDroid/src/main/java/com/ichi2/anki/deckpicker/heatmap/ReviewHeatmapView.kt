@@ -92,8 +92,16 @@ class ReviewHeatmapView
                 if (ReviewHeatmap.searchForDay(currentData, date) != null) onDaySelected?.invoke(currentData, date)
             }
             setLoading()
-            findViewById<View>(R.id.review_heatmap_aki).isVisible =
-                AnkiDroidApp.sharedPrefsOrNull() != null && AnkiquestNavigation.enabled()
+            val companion = findViewById<android.widget.ImageView>(R.id.review_heatmap_aki)
+            companion.isVisible = AnkiDroidApp.sharedPrefsOrNull() != null && AnkiquestNavigation.enabled() &&
+                com.ichi2.anki.ankiquest.AnkiquestCompanion
+                    .visible()
+            if (companion.isVisible) {
+                companion.setImageResource(
+                    com.ichi2.anki.ankiquest.AnkiquestCompanion
+                        .resource(R.drawable.aki_streak),
+                )
+            }
         }
 
         fun setData(data: ReviewHeatmapData) = setData(data, state)

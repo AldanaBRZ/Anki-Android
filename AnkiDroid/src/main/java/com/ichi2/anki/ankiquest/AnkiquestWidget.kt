@@ -200,6 +200,13 @@ open class AnkiquestWidget : AppWidgetProvider() {
             period: String = "week",
         ): RemoteViews {
             val views = RemoteViews(context.packageName, style.layout)
+            views.setViewVisibility(R.id.ankiquest_widget_companion, if (AnkiquestCompanion.visible()) View.VISIBLE else View.GONE)
+            if (AnkiquestCompanion.visible()) {
+                views.setImageViewResource(
+                    R.id.ankiquest_widget_companion,
+                    AnkiquestCompanion.resource(R.drawable.aki_face),
+                )
+            }
             views.setTextViewText(
                 R.id.ankiquest_widget_period,
                 AnkiquestLanguage.context(context).getString(PERIODS.first { it.name == period }.label),
