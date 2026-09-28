@@ -32,6 +32,8 @@ import java.net.InetSocketAddress
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
@@ -132,6 +134,28 @@ class AnkiquestPollTest : RobolectricTest() {
             assertEquals(Result.success(), worker().doWork())
 
             verify(exactly = 1) { AnkiquestNotifier.onDeckCompletions(any(), "$url/cerro", any(), any()) }
+        }
+
+    @Test
+    fun `inbox health records only successful syncs for the current account`() =
+        runBlocking {
+            assertNull(AnkiquestNotificationHealth.lastSuccessfulSync())
+            assertEquals(Result.success(), worker().doWork())
+            val synced = assertNotNull(AnkiquestNotificationHealth.lastSuccessfulSync())
+            assertTrue(synced > 0L)
+
+            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "other") }
+            assertNull(AnkiquestNotificationHealth.lastSuccessfulSync())
+            AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "cerro") }
+            assertEquals(synced, AnkiquestNotificationHealth.lastSuccessfulSync())
+        }
+
+    @Test
+    fun `failed inbox sync does not claim success`() =
+        runBlocking {
+            inboxStatus = 503
+            assertEquals(Result.retry(), worker().doWork())
+            assertNull(AnkiquestNotificationHealth.lastSuccessfulSync())
         }
 
     @Test

@@ -50,6 +50,7 @@ object AnkiquestNotifier {
     private const val STREAK_DAY_KEY = "ankiquestStreakNotifiedDay"
     private const val RANK_ID = 5_130_001
     private const val STREAK_ID = 5_130_002
+    private const val TEST_ID = 5_130_003
     private const val HOUR_MS = 60 * 60 * 1000L
 
     @Synchronized
@@ -237,6 +238,29 @@ object AnkiquestNotifier {
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
         }
 
+    /** A local alert checks Android delivery without sending a server message. */
+    fun testAlert(context: Context): Delivery =
+        notify(
+            context,
+            TEST_ID,
+            AnkiquestLanguage.context(context).getString(R.string.ankiquest_health_test_title),
+            AnkiquestLanguage.context(context).getString(R.string.ankiquest_health_test_body),
+            context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?: Intent(context, AnkiquestHomeActivity::class.java),
+        )
+
+    fun alertsEnabled(
+        context: Context,
+        nudge: Boolean,
+    ): Boolean {
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return manager.getNotificationChannel(ensureChannel(context, nudge))?.importance?.let {
+            it != NotificationManagerCompat.IMPORTANCE_NONE
+        } ?: false
+    }
+
     private fun ensureChannel(
         context: Context,
         nudge: Boolean,
@@ -260,7 +284,7 @@ object AnkiquestNotifier {
         return channel
     }
 
-    private enum class Delivery {
+    enum class Delivery {
         POSTED,
         CHANNEL_BLOCKED,
         DISABLED,

@@ -124,6 +124,7 @@ object AnkiquestPoll {
         val result =
             try {
                 Ankiquest.completionNotifications()?.let { (account, notifications, scope) ->
+                    AnkiquestNotificationHealth.recordSuccessfulSync(scope, TimeManager.time.intTimeMS(), prefs)
                     AnkiquestNotifier.onDeckCompletions(context, account, notifications, scope)
                 }
                 Result.success()

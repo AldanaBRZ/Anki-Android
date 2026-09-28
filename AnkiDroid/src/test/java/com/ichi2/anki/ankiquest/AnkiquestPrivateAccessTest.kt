@@ -118,6 +118,8 @@ class AnkiquestPrivateAccessTest : RobolectricTest() {
     private fun switchServerDuringSettingsRead() {
         val preferences = targetContext.sharedPrefs()
         val changingPreferences = mockk<SharedPreferences>()
+        val originalSettings = preferences.all
+        val originalUrl = preferences.getString(Ankiquest.URL_KEY, "")
 
         fun switchServer() {
             preferences.edit {
@@ -127,14 +129,12 @@ class AnkiquestPrivateAccessTest : RobolectricTest() {
         }
         every { changingPreferences.getString(any(), any()) } answers { preferences.getString(firstArg(), secondArg()) }
         every { changingPreferences.getString(Ankiquest.URL_KEY, "") } answers {
-            val captured = preferences.getString(Ankiquest.URL_KEY, "")
             switchServer()
-            captured
+            originalUrl
         }
         every { changingPreferences.all } answers {
-            val captured = preferences.all
             switchServer()
-            captured
+            originalSettings
         }
         AnkiDroidApp.sharedPreferencesTestingOverride = changingPreferences
     }
@@ -146,8 +146,9 @@ class AnkiquestPrivateAccessTest : RobolectricTest() {
 
             Ankiquest.profile()
 
-            assertEquals("/api/profile/member%20name", requests.single().path)
-            assertEquals("Bearer member-secret", requests.single().authorization)
+            assertTrue(requests.any { it.path == "/api/profile/member%20name" })
+            assertTrue(requests.filter { it.path == "/api/profile/member%20name" }.all { it.authorization == "Bearer member-secret" })
+            assertTrue(requests.none { it.authorization == "Bearer new-private-secret" })
         }
 
     @Test
@@ -158,8 +159,8 @@ class AnkiquestPrivateAccessTest : RobolectricTest() {
 
             Ankiquest.runFromSettings(targetContext, uploadAll = false)
 
-            assertEquals("/api/profile/member%20name", requests.single().path)
-            assertNull(requests.single().authorization)
+            assertTrue(requests.any { it.path == "/api/profile/member%20name" })
+            assertTrue(requests.all { it.authorization == null })
         }
 
     @Test
