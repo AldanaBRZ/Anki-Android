@@ -86,7 +86,7 @@ class AnkiquestSettingsTest : RobolectricTest() {
     @Test
     fun `streak protection is available in native settings`() {
         val keys = mutableListOf<String>()
-        targetContext.resources.getXml(R.xml.preferences_ankiquest).use { xml ->
+        targetContext.resources.getXml(R.xml.preferences_ankiquest_study).use { xml ->
             while (xml.next() != XmlPullParser.END_DOCUMENT) {
                 if (xml.eventType != XmlPullParser.START_TAG) continue
                 val key = xml.getAttributeResourceValue("http://schemas.android.com/apk/res/android", "key", 0)

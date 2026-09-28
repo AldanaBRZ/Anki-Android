@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
     <string name="ankiquest_companion_key" translatable="false">ankiquestCompanion</string>
-    <string name="ankiquest_companion_title">Study companion</string>
+    <string name="ankiquest_companion_title" maxLength="41">Study companion</string>
     <string name="ankiquest_companion_summary">Choose Aki, Ankilope, or no companion. Synced across devices.</string>
     <string name="ankiquest_companion_none">No companion</string>
     <string-array name="ankiquest_companion_entries">

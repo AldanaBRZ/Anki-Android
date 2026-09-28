@@ -43,6 +43,7 @@ class AnkiquestSettingsMenuTest : RobolectricTest() {
                 R.string.ankiquest_user_key,
                 R.string.ankiquest_token_key,
                 R.string.ankiquest_avatar_key,
+                R.string.ankiquest_companion_key,
                 R.string.ankiquest_test_key,
                 R.string.ankiquest_open_today_key,
                 R.string.ankiquest_summary_preference_key,

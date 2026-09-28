@@ -97,6 +97,11 @@ class PreferencesAnalyticsTest : RobolectricTest() {
             R.string.pref_allow_card_external_launch_key, // allowCardExternalLaunch
             // ankiquest: server, player and token are personal, the rest are actions or screens
             R.string.ankiquest_screen_key,
+            R.string.ankiquest_account_screen_key,
+            R.string.ankiquest_study_screen_key,
+            R.string.ankiquest_notifications_screen_key,
+            R.string.ankiquest_sharing_screen_key,
+            R.string.ankiquest_maintenance_screen_key,
             R.string.ankiquest_url_key,
             R.string.ankiquest_user_key,
             R.string.ankiquest_token_key,
@@ -106,6 +111,7 @@ class PreferencesAnalyticsTest : RobolectricTest() {
             R.string.ankiquest_update_channel_key,
             R.string.ankiquest_deck_notifications_key,
             R.string.ankiquest_avatar_key,
+            R.string.ankiquest_companion_key,
             R.string.ankiquest_notify_rank_key,
             R.string.ankiquest_streak_hours_key,
             R.string.ankiquest_nudges_key,
