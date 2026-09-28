@@ -5,7 +5,7 @@
     <string name="ankiquest_account_summary">Servidor, jogador, token e foto de perfil</string>
     <string name="ankiquest_study_title">Estudo e sequências</string>
     <string name="ankiquest_study_summary">Estudo diário e proteção de sequências</string>
-    <string name="ankiquest_notifications_title">Notificações</string>
+    <string name="ankiquest_notifications_title">Lembretes e alertas</string>
     <string name="ankiquest_notifications_summary">Lembretes, incentivos e alertas</string>
     <string name="ankiquest_sharing_title">Amigos e partilha</string>
     <string name="ankiquest_sharing_summary">Avisos de baralhos e subscrições</string>
