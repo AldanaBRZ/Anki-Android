@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ankiquest_health_key" translatable="false">ankiquestNotificationHealth</string>
-    <string name="ankiquest_health_title">Notification health</string>
+    <string name="ankiquest_health_title" maxLength="41">Notification health</string>
     <string name="ankiquest_health_summary">Check delivery and send a test alert</string>
     <string name="ankiquest_health_permission">Notification permission: %1$s</string>
     <string name="ankiquest_health_messages">Message alerts: %1$s</string>
