@@ -19,6 +19,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.text.format.DateFormat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -36,6 +37,7 @@ import com.ichi2.anki.ankiquest.AnkiquestAvatarEditor
 import com.ichi2.anki.ankiquest.AnkiquestAvatars
 import com.ichi2.anki.ankiquest.AnkiquestDeckAdapter
 import com.ichi2.anki.ankiquest.AnkiquestDeckTree
+import com.ichi2.anki.ankiquest.AnkiquestNotificationHealth
 import com.ichi2.anki.ankiquest.AnkiquestNotifier
 import com.ichi2.anki.ankiquest.AnkiquestPoll
 import com.ichi2.anki.ankiquest.AnkiquestUpdater
@@ -45,6 +47,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
+import java.util.Date
 
 class AnkiquestSettingsFragment : SettingsFragment() {
     override val preferenceResource = R.xml.preferences_ankiquest
@@ -146,6 +149,10 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         }
         bindAlertSettings(R.string.ankiquest_message_alerts_key, nudge = false)
         bindAlertSettings(R.string.ankiquest_nudge_alerts_key, nudge = true)
+        requirePreference<Preference>(R.string.ankiquest_health_key).setOnPreferenceClickListener {
+            showNotificationHealth()
+            true
+        }
         bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
         bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
         bindAction(R.string.ankiquest_deck_notifications_key) {
@@ -197,13 +204,74 @@ class AnkiquestSettingsFragment : SettingsFragment() {
         nudge: Boolean,
     ) {
         requirePreference<Preference>(key).setOnPreferenceClickListener {
-            try {
-                startActivity(AnkiquestNotifier.alertSettingsIntent(requireContext(), nudge))
-            } catch (_: ActivityNotFoundException) {
-                openAppSettingsScreen()
-            }
+            openAlertSettings(nudge)
             true
         }
+    }
+
+    private fun openAlertSettings(nudge: Boolean) {
+        try {
+            startActivity(AnkiquestNotifier.alertSettingsIntent(requireContext(), nudge))
+        } catch (_: ActivityNotFoundException) {
+            openAppSettingsScreen()
+        }
+    }
+
+    private fun showNotificationHealth() {
+        val context = requireContext()
+        val permissionGranted =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val state = { enabled: Boolean -> getString(if (enabled) R.string.ankiquest_health_allowed else R.string.ankiquest_health_blocked) }
+        val lastSync =
+            AnkiquestNotificationHealth.lastSuccessfulSync()?.let { at ->
+                val date = Date(at)
+                "${DateFormat.getDateFormat(context).format(date)} ${DateFormat.getTimeFormat(context).format(date)}"
+            } ?: getString(R.string.ankiquest_health_never)
+        val details =
+            listOf(
+                getString(R.string.ankiquest_health_permission, state(permissionGranted)),
+                getString(R.string.ankiquest_health_messages, state(AnkiquestNotifier.alertsEnabled(context, false))),
+                getString(R.string.ankiquest_health_nudges, state(AnkiquestNotifier.alertsEnabled(context, true))),
+                getString(R.string.ankiquest_health_last_sync, lastSync),
+            ).joinToString("\n")
+        AlertDialog
+            .Builder(context)
+            .setTitle(R.string.ankiquest_health_title)
+            .setMessage(details)
+            .setItems(
+                arrayOf(
+                    getString(R.string.ankiquest_health_test),
+                    getString(R.string.ankiquest_health_permission_settings),
+                    getString(R.string.ankiquest_message_alerts_title),
+                    getString(R.string.ankiquest_nudge_alerts_title),
+                ),
+            ) { _, choice ->
+                when (choice) {
+                    0 -> {
+                        val message =
+                            when (AnkiquestNotifier.testAlert(context)) {
+                                AnkiquestNotifier.Delivery.POSTED -> R.string.ankiquest_health_test_posted
+                                AnkiquestNotifier.Delivery.CHANNEL_BLOCKED -> R.string.ankiquest_health_test_blocked
+                                AnkiquestNotifier.Delivery.DISABLED -> R.string.ankiquest_health_test_disabled
+                            }
+                        AlertDialog
+                            .Builder(context)
+                            .setMessage(message)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                    1 ->
+                        if (!permissionGranted) {
+                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            openAppSettingsScreen()
+                        }
+                    2 -> openAlertSettings(nudge = false)
+                    3 -> openAlertSettings(nudge = true)
+                }
+            }.setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun bindDashboard(
