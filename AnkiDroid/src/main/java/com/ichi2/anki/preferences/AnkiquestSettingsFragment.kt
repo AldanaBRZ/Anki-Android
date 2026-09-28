@@ -239,37 +239,41 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             .Builder(context)
             .setTitle(R.string.ankiquest_health_title)
             .setMessage(details)
-            .setItems(
-                arrayOf(
-                    getString(R.string.ankiquest_health_test),
-                    getString(R.string.ankiquest_health_permission_settings),
-                    getString(R.string.ankiquest_message_alerts_title),
-                    getString(R.string.ankiquest_nudge_alerts_title),
-                ),
-            ) { _, choice ->
-                when (choice) {
-                    0 -> {
-                        val message =
-                            when (AnkiquestNotifier.testAlert(context)) {
-                                AnkiquestNotifier.Delivery.POSTED -> R.string.ankiquest_health_test_posted
-                                AnkiquestNotifier.Delivery.CHANNEL_BLOCKED -> R.string.ankiquest_health_test_blocked
-                                AnkiquestNotifier.Delivery.DISABLED -> R.string.ankiquest_health_test_disabled
-                            }
-                        AlertDialog
-                            .Builder(context)
-                            .setMessage(message)
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show()
+            .setPositiveButton(R.string.ankiquest_health_test) { _, _ ->
+                val message =
+                    when (AnkiquestNotifier.testAlert(context)) {
+                        AnkiquestNotifier.Delivery.POSTED -> R.string.ankiquest_health_test_posted
+                        AnkiquestNotifier.Delivery.CHANNEL_BLOCKED -> R.string.ankiquest_health_test_blocked
+                        AnkiquestNotifier.Delivery.DISABLED -> R.string.ankiquest_health_test_disabled
                     }
-                    1 ->
-                        if (!permissionGranted) {
-                            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            openAppSettingsScreen()
+                AlertDialog
+                    .Builder(context)
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }.setNeutralButton(R.string.settings) { _, _ ->
+                AlertDialog
+                    .Builder(context)
+                    .setTitle(R.string.settings)
+                    .setItems(
+                        arrayOf(
+                            getString(R.string.ankiquest_health_permission_settings),
+                            getString(R.string.ankiquest_message_alerts_title),
+                            getString(R.string.ankiquest_nudge_alerts_title),
+                        ),
+                    ) { _, choice ->
+                        when (choice) {
+                            0 ->
+                                if (!permissionGranted) {
+                                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    openAppSettingsScreen()
+                                }
+                            1 -> openAlertSettings(nudge = false)
+                            2 -> openAlertSettings(nudge = true)
                         }
-                    2 -> openAlertSettings(nudge = false)
-                    3 -> openAlertSettings(nudge = true)
-                }
+                    }.setNegativeButton(android.R.string.cancel, null)
+                    .show()
             }.setNegativeButton(android.R.string.cancel, null)
             .show()
     }
