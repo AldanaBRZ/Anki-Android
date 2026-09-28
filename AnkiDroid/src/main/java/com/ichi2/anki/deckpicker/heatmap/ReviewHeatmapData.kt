@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package com.ichi2.anki.deckpicker.heatmap
+
+import com.ichi2.anki.libanki.Collection
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+
+/** Local collection history: counts are answers, not distinct cards or server points. */
+data class ReviewHeatmapData(
+    val today: LocalDate,
+    val reviews: Map<LocalDate, Int>,
+    val scheduled: Map<LocalDate, Int>,
+    val currentStreak: Int,
+    val longestStreak: Int,
+    val totalReviews: Long,
+    val daysStudied: Int,
+    val firstReviewDate: LocalDate?,
+    val dailyAverage: Double,
+) {
+    val forecastEndDate: LocalDate get() = today.plusDays(ReviewHeatmap.FORECAST_DAYS)
+}
+
+object ReviewHeatmap {
+    const val FORECAST_DAYS = 90L
+    private const val DAY_MILLIS = 86_400_000L
+
+    /** Call inside CollectionManager.withCol, away from the main thread. */
+    fun load(col: Collection): ReviewHeatmapData {
+        val timing = col.backend.schedTimingToday()
+        val today = studyDate(timing.nextDayAt)
+        val cutoffMillis = timing.nextDayAt * 1000L
+        val reviews = mutableMapOf<LocalDate, Int>()
+        // Anki's day searches use consecutive 24-hour windows ending at its current
+        // scheduler cutoff. Revlog has no historical timezone, so use the same windows
+        // as prop:rated, including the exact millisecond at the start of a study day.
+        // Do not join cards: retained reviews of deleted cards still represent study.
+        col.db
+            .query(
+                "select (? - 1 - id) / $DAY_MILLIS, count(*) from revlog " +
+                    "where id >= 0 and id < ? and ease > 0 and type < 4 group by 1",
+                cutoffMillis,
+                cutoffMillis,
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    reviews[today.minusDays(cursor.getLong(0))] = cursor.getInt(1)
+                }
+            }
+        val scheduled = mutableMapOf<LocalDate, Int>()
+        // Match the native browser's prop:due expression, including original due dates
+        // in filtered decks and timestamp-based learning/preview queues. New, suspended,
+        // and buried cards are not currently scheduled answers in this forecast.
+        col.db
+            .query(
+                "select day_offset, count(*) from (" +
+                    "select case when queue in (2, 3) then " +
+                    "(case when odue != 0 then odue else due end) - ? " +
+                    "else ((case when odue != 0 then odue else due end) - ?) / 86400 end as day_offset " +
+                    "from cards where queue in (1, 2, 3, 4) and type != 0" +
+                    ") where day_offset between 1 and ? group by day_offset",
+                timing.daysElapsed,
+                timing.nextDayAt,
+                FORECAST_DAYS,
+            ).use { cursor ->
+                while (cursor.moveToNext()) {
+                    scheduled[today.plusDays(cursor.getLong(0))] = cursor.getInt(1)
+                }
+            }
+        return summarize(today, reviews, scheduled)
+    }
+
+    /** Native search keeps a card that was answered on this day and on other days. */
+    fun searchForDay(
+        data: ReviewHeatmapData,
+        date: LocalDate,
+    ): String? {
+        val offset = ChronoUnit.DAYS.between(data.today, date)
+        return when {
+            offset <= 0 && (data.reviews[date] ?: 0) > 0 -> searchForOffset(offset)
+            offset in 1..FORECAST_DAYS && (data.scheduled[date] ?: 0) > 0 -> searchForOffset(offset)
+            else -> null
+        }
+    }
+
+    /** Refresh the search's day offset at tap time without scanning collection history again. */
+    fun searchForDay(
+        col: Collection,
+        date: LocalDate,
+    ): String? {
+        val today = studyDate(col.backend.schedTimingToday().nextDayAt)
+        return searchForOffset(ChronoUnit.DAYS.between(today, date))
+    }
+
+    private fun searchForOffset(offset: Long): String? =
+        when {
+            offset <= 0 -> "prop:rated=$offset"
+            offset <= FORECAST_DAYS -> "prop:due=$offset -is:new"
+            else -> null
+        }
+
+    /** The scheduler cutoff is tomorrow's rollover, including before today's rollover. */
+    internal fun studyDate(
+        nextDayAt: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LocalDate =
+        Instant
+            .ofEpochSecond(nextDayAt)
+            .atZone(zone)
+            .toLocalDate()
+            .minusDays(1)
+
+    internal fun summarize(
+        today: LocalDate,
+        reviews: Map<LocalDate, Int>,
+        scheduled: Map<LocalDate, Int>,
+    ): ReviewHeatmapData {
+        val history = reviews.filter { (date, count) -> date <= today && count > 0 }.toSortedMap()
+        val forecastEnd = today.plusDays(FORECAST_DAYS)
+        val forecast = scheduled.filter { (date, count) -> date > today && date <= forecastEnd && count > 0 }.toSortedMap()
+        var currentStreak = 0
+        var day = if (history.containsKey(today)) today else today.minusDays(1)
+        while (history.containsKey(day)) {
+            currentStreak++
+            day = day.minusDays(1)
+        }
+        var longestStreak = 0
+        var run = 0
+        var previousDay: LocalDate? = null
+        for (studiedDay in history.keys) {
+            run = if (previousDay?.plusDays(1) == studiedDay) run + 1 else 1
+            longestStreak = maxOf(longestStreak, run)
+            previousDay = studiedDay
+        }
+        val firstReviewDate = history.keys.firstOrNull()
+        val totalReviews = history.values.sumOf { it.toLong() }
+        return ReviewHeatmapData(
+            today = today,
+            reviews = history,
+            scheduled = forecast,
+            currentStreak = currentStreak,
+            longestStreak = longestStreak,
+            totalReviews = totalReviews,
+            daysStudied = history.size,
+            firstReviewDate = firstReviewDate,
+            dailyAverage = if (history.isNotEmpty()) totalReviews.toDouble() / history.size else 0.0,
+        )
+    }
+}

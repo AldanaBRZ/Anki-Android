@@ -410,6 +410,11 @@
             android:label="@string/ankiquest_screen_title"
             android:exported="false"
             />
+        <activity
+            android:name="com.ichi2.anki.ankiquest.AnkiquestHomeActivity"
+            android:label="@string/ankiquest_screen_title"
+            android:exported="false"
+            />
 
         <activity-alias
             android:name="com.ichi2.anki.AnkiCardContextMenuAction"
@@ -543,6 +548,18 @@
             android:exported="false" />
 
         <receiver
+            android:name="com.ichi2.anki.ankiquest.AnkiquestReplyReceiver"
+            android:exported="false" />
+
+        <activity
+            android:name="com.ichi2.anki.ankiquest.AnkiquestWidgetConfig"
+            android:label="@string/ankiquest_widget_period_title"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <receiver
             android:name="com.ichi2.anki.ankiquest.AnkiquestWidget"
             android:label="@string/ankiquest_widget_label"
             android:exported="true">
@@ -552,6 +569,17 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_provider_ankiquest" />
+        </receiver>
+        <receiver
+            android:name="com.ichi2.anki.ankiquest.AnkiquestTransparentWidget"
+            android:label="@string/ankiquest_widget_transparent_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_provider_ankiquest_transparent" />
         </receiver>
 
         <!-- "Add Note" widget -->

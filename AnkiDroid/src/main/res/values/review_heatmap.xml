@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="review_heatmap_title">Review heatmap</string>
+    <string name="review_heatmap_subtitle">Your collection, one day at a time</string>
+    <string name="review_heatmap_expand">Expand review heatmap</string>
+    <string name="review_heatmap_collapse">Collapse review heatmap</string>
+    <string name="review_heatmap_loading">Loading review history…</string>
+    <string name="review_heatmap_error">Review history could not be loaded.</string>
+    <string name="review_heatmap_empty">Your reviews will appear here after you study.</string>
+    <string name="review_heatmap_current_streak">Current streak</string>
+    <string name="review_heatmap_longest_streak">Longest streak</string>
+    <string name="review_heatmap_days_studied">Days studied</string>
+    <string name="review_heatmap_daily_average">Reviews / study day</string>
+    <string name="review_heatmap_stat">%1$s\n%2$s</string>
+    <string name="review_heatmap_total">Reviews in available history: %1$s</string>
+    <string name="review_heatmap_previous_year">Previous year</string>
+    <string name="review_heatmap_next_year">Next year</string>
+    <string name="review_heatmap_year">Year %1$s</string>
+    <string name="review_heatmap_scroll_hint">Swipe to explore the year. Tap a day for details.</string>
+    <string name="review_heatmap_forecast_hint">Gray squares show estimated review cards due over the next 90 days. Counts change as you study.</string>
+    <string name="review_heatmap_legend">Fewer reviews → More reviews · Gray = forecast</string>
+    <string name="review_heatmap_day_description">%1$s. %2$s</string>
+    <string name="review_heatmap_today_description">%1$s. Today</string>
+    <string name="review_heatmap_forecast_unavailable">Forecast is available for the next 90 days.</string>
+    <string name="review_heatmap_view_reviewed_cards">View reviewed cards</string>
+    <string name="review_heatmap_view_due_cards">View due cards</string>
+    <plurals name="review_heatmap_review_count">
+        <item quantity="one">%1$s review</item>
+        <item quantity="other">%1$s reviews</item>
+    </plurals>
+    <plurals name="review_heatmap_due_count">
+        <item quantity="one">%1$s review card due (estimate)</item>
+        <item quantity="other">%1$s review cards due (estimate)</item>
+    </plurals>
+    <plurals name="review_heatmap_streak_days">
+        <item quantity="one">%1$s day</item>
+        <item quantity="other">%1$s days</item>
+    </plurals>
+    <color name="review_heatmap_empty">#E7ECE9</color>
+    <color name="review_heatmap_level_one">#BAE1C4</color>
+    <color name="review_heatmap_level_two">#77C58F</color>
+    <color name="review_heatmap_level_three">#369D5B</color>
+    <color name="review_heatmap_level_four">#136C37</color>
+    <color name="review_heatmap_forecast_one">#D4D9DF</color>
+    <color name="review_heatmap_forecast_two">#ABB3BE</color>
+    <color name="review_heatmap_forecast_three">#7D8998</color>
+    <color name="review_heatmap_forecast_four">#546171</color>
+</resources>

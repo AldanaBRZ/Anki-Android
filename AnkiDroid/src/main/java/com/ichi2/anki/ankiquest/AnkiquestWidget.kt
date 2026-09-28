@@ -23,13 +23,23 @@ import android.content.Intent
 import android.text.format.DateUtils
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.DrawableRes
+import androidx.annotation.LayoutRes
+import androidx.annotation.StringRes
+import androidx.core.app.PendingIntentCompat
+import androidx.core.content.edit
+import androidx.core.widget.RemoteViewsCompat
+import androidx.core.widget.RemoteViewsCompat.RemoteCollectionItems
+import com.ichi2.anki.AnkiDroidApp
+import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.common.time.TimeManager
 import org.json.JSONArray
+import org.json.JSONObject
 import java.text.NumberFormat
 
-/** Homescreen widget with this week's ankiquest leaderboard. Tapping it opens the dashboard. */
-class AnkiquestWidget : AppWidgetProvider() {
+/** Scrollable homescreen leaderboard. Tapping the header or a player opens the dashboard. */
+open class AnkiquestWidget : AppWidgetProvider() {
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -58,63 +68,76 @@ class AnkiquestWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.ichi2.anki.ankiquest.WIDGET_REFRESH"
         private const val MIN_REFRESH_MS = 30 * 1000L
+        private const val PERIOD_KEY = "ankiquestWidgetPeriod"
         private val medals = arrayOf("👑", "🥈", "🥉")
 
-        private val rows =
-            intArrayOf(
-                R.id.ankiquest_widget_row_0,
-                R.id.ankiquest_widget_row_1,
-                R.id.ankiquest_widget_row_2,
-                R.id.ankiquest_widget_row_3,
-                R.id.ankiquest_widget_row_4,
+        /** The leaderboard periods a widget can show, as served by the ankiquest API. */
+        class Period(
+            val name: String,
+            @StringRes val label: Int,
+        )
+
+        val PERIODS =
+            listOf(
+                Period("hour", R.string.ankiquest_period_hour),
+                Period("day", R.string.ankiquest_period_day),
+                Period("week", R.string.ankiquest_period_week),
+                Period("month", R.string.ankiquest_period_month),
+                Period("year", R.string.ankiquest_period_year),
+                Period("all", R.string.ankiquest_period_all),
             )
-        private val ranks =
-            intArrayOf(
-                R.id.ankiquest_widget_rank_0,
-                R.id.ankiquest_widget_rank_1,
-                R.id.ankiquest_widget_rank_2,
-                R.id.ankiquest_widget_rank_3,
-                R.id.ankiquest_widget_rank_4,
-            )
-        private val names =
-            intArrayOf(
-                R.id.ankiquest_widget_name_0,
-                R.id.ankiquest_widget_name_1,
-                R.id.ankiquest_widget_name_2,
-                R.id.ankiquest_widget_name_3,
-                R.id.ankiquest_widget_name_4,
-            )
-        private val streaks =
-            intArrayOf(
-                R.id.ankiquest_widget_streak_0,
-                R.id.ankiquest_widget_streak_1,
-                R.id.ankiquest_widget_streak_2,
-                R.id.ankiquest_widget_streak_3,
-                R.id.ankiquest_widget_streak_4,
-            )
-        private val levels =
-            intArrayOf(
-                R.id.ankiquest_widget_level_0,
-                R.id.ankiquest_widget_level_1,
-                R.id.ankiquest_widget_level_2,
-                R.id.ankiquest_widget_level_3,
-                R.id.ankiquest_widget_level_4,
-            )
-        private val bars =
-            intArrayOf(
-                R.id.ankiquest_widget_bar_0,
-                R.id.ankiquest_widget_bar_1,
-                R.id.ankiquest_widget_bar_2,
-                R.id.ankiquest_widget_bar_3,
-                R.id.ankiquest_widget_bar_4,
-            )
-        private val xps =
-            intArrayOf(
-                R.id.ankiquest_widget_xp_0,
-                R.id.ankiquest_widget_xp_1,
-                R.id.ankiquest_widget_xp_2,
-                R.id.ankiquest_widget_xp_3,
-                R.id.ankiquest_widget_xp_4,
+
+        fun periodOf(
+            context: Context,
+            widgetId: Int,
+        ): String = AnkiDroidApp.sharedPrefs().getString("$PERIOD_KEY:$widgetId", null) ?: "week"
+
+        fun setPeriod(
+            context: Context,
+            widgetId: Int,
+            period: String,
+        ) {
+            AnkiDroidApp.sharedPrefs().edit { putString("$PERIOD_KEY:$widgetId", period) }
+            AnkiquestPoll.refreshNow(context)
+        }
+
+        /** Orders [board] by the XP of [period], falling back to the week for older servers. */
+        internal fun forPeriod(
+            board: JSONArray,
+            period: String,
+        ): JSONArray {
+            val entries = (0 until board.length()).map { board.getJSONObject(it) }
+            val xpOf = { entry: JSONObject ->
+                entry.optJSONObject("periods")?.optLong(period) ?: entry.optLong("week_xp")
+            }
+            val ordered = JSONArray()
+            entries
+                .sortedWith(compareByDescending(xpOf).thenByDescending { it.optLong("xp_total") })
+                .forEach { ordered.put(JSONObject(it.toString()).put("xp", xpOf(it))) }
+            return ordered
+        }
+
+        internal class Style(
+            val provider: Class<out AnkiquestWidget>,
+            @LayoutRes val layout: Int,
+            @LayoutRes val rowLayout: Int,
+            @DrawableRes val ownRow: Int,
+        )
+
+        internal val styles =
+            listOf(
+                Style(
+                    AnkiquestWidget::class.java,
+                    R.layout.widget_ankiquest,
+                    R.layout.widget_ankiquest_row,
+                    R.drawable.ankiquest_widget_row_self,
+                ),
+                Style(
+                    AnkiquestTransparentWidget::class.java,
+                    R.layout.widget_ankiquest_transparent,
+                    R.layout.widget_ankiquest_row_transparent,
+                    R.drawable.ankiquest_widget_row_self_clear,
+                ),
             )
 
         @Volatile
@@ -128,21 +151,39 @@ class AnkiquestWidget : AppWidgetProvider() {
             AnkiquestPoll.refreshNow(context)
         }
 
-        private fun widgetIds(context: Context): IntArray =
+        private fun widgetIds(
+            context: Context,
+            style: Style,
+        ): IntArray =
             AppWidgetManager
                 .getInstance(context)
-                .getAppWidgetIds(ComponentName(context, AnkiquestWidget::class.java))
+                .getAppWidgetIds(ComponentName(context, style.provider))
+
+        internal fun widgetDestination(
+            context: Context,
+            period: String,
+        ): Intent =
+            (
+                if (AnkiquestNavigation.enabled()) {
+                    Intent(context, AnkiquestActivity::class.java)
+                        .putExtra(AnkiquestActivity.EXTRA_PATH, "/${PERIODS.firstOrNull { it.name == period }?.name ?: "week"}")
+                } else {
+                    Intent(context, DeckPicker::class.java)
+                }
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         private fun showRefreshing(context: Context) {
-            val ids = widgetIds(context)
-            if (ids.isEmpty()) return
-            val views = RemoteViews(context.packageName, R.layout.widget_ankiquest)
-            views.setTextViewText(R.id.ankiquest_widget_updated, "…")
-            AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(ids, views)
+            for (style in styles) {
+                val ids = widgetIds(context, style)
+                if (ids.isEmpty()) continue
+                val views = RemoteViews(context.packageName, style.layout)
+                views.setTextViewText(R.id.ankiquest_widget_updated, "…")
+                AppWidgetManager.getInstance(context).partiallyUpdateAppWidget(ids, views)
+            }
         }
 
         /**
-         * Draws [board] into every placed widget.
+         * Draws [board] into every placed widget of every style.
          *
          * @param board this week's standings, or null when ankiquest is not configured
          * @param fetchedAt when [board] was fetched from the server
@@ -154,16 +195,52 @@ class AnkiquestWidget : AppWidgetProvider() {
             fetchedAt: Long,
             offline: Boolean,
         ) {
-            val ids = widgetIds(context)
-            if (ids.isEmpty()) return
-            val views = RemoteViews(context.packageName, R.layout.widget_ankiquest)
+            val manager = AppWidgetManager.getInstance(context)
+            for (style in styles) {
+                val ids = widgetIds(context, style)
+                if (ids.isEmpty()) continue
+                for (id in ids) {
+                    val period = periodOf(context, id)
+                    val ranked = board?.let { forPeriod(it, period) }
+                    val items = collection(context, ranked ?: JSONArray(), style)
+                    val views = layout(context, ranked, fetchedAt, offline, style, period)
+                    // Each placed widget needs its own adapter ID, including transparent ones.
+                    RemoteViewsCompat.setRemoteAdapter(context, views, id, R.id.ankiquest_widget_list, items)
+                    manager.updateAppWidget(id, views)
+                }
+            }
+        }
+
+        internal fun layout(
+            context: Context,
+            board: JSONArray?,
+            fetchedAt: Long,
+            offline: Boolean,
+            style: Style = styles.first(),
+            period: String = "week",
+        ): RemoteViews {
+            val views = RemoteViews(context.packageName, style.layout)
+            views.setTextViewText(
+                R.id.ankiquest_widget_period,
+                context.getString(PERIODS.first { it.name == period }.label),
+            )
             views.setOnClickPendingIntent(
                 R.id.ankiquest_widget_root,
                 PendingIntent.getActivity(
                     context,
-                    0,
-                    Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    1000 + period.hashCode(),
+                    widgetDestination(context, period),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            views.setPendingIntentTemplate(
+                R.id.ankiquest_widget_list,
+                PendingIntentCompat.getActivity(
+                    context,
+                    2000 + period.hashCode(),
+                    widgetDestination(context, period),
+                    PendingIntent.FLAG_UPDATE_CURRENT,
+                    true,
                 ),
             )
             views.setOnClickPendingIntent(
@@ -171,7 +248,7 @@ class AnkiquestWidget : AppWidgetProvider() {
                 PendingIntent.getBroadcast(
                     context,
                     1,
-                    Intent(context, AnkiquestWidget::class.java).setAction(ACTION_REFRESH),
+                    Intent(context, style.provider).setAction(ACTION_REFRESH),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
@@ -187,9 +264,12 @@ class AnkiquestWidget : AppWidgetProvider() {
                 board == null -> status(views, context.getString(R.string.ankiquest_widget_unconfigured))
                 board.length() == 0 && offline -> status(views, context.getString(R.string.ankiquest_widget_offline))
                 board.length() == 0 -> status(views, context.getString(R.string.ankiquest_widget_empty))
-                else -> fill(context, views, board)
+                else -> {
+                    views.setViewVisibility(R.id.ankiquest_widget_status, View.GONE)
+                    views.setViewVisibility(R.id.ankiquest_widget_list, View.VISIBLE)
+                }
             }
-            AppWidgetManager.getInstance(context).updateAppWidget(ids, views)
+            return views
         }
 
         private fun status(
@@ -198,37 +278,52 @@ class AnkiquestWidget : AppWidgetProvider() {
         ) {
             views.setTextViewText(R.id.ankiquest_widget_status, text)
             views.setViewVisibility(R.id.ankiquest_widget_status, View.VISIBLE)
+            views.setViewVisibility(R.id.ankiquest_widget_list, View.GONE)
         }
 
-        private fun fill(
+        internal fun collection(
             context: Context,
-            views: RemoteViews,
             board: JSONArray,
-        ) {
+            style: Style = styles.first(),
+        ): RemoteCollectionItems {
+            val items = RemoteCollectionItems.Builder().setViewTypeCount(1)
             val me = Ankiquest.player()
             val numbers = NumberFormat.getIntegerInstance()
-            val leaderXp = board.getJSONObject(0).getLong("week_xp").coerceAtLeast(1)
-            for (i in rows.indices) {
-                if (i >= board.length()) {
-                    views.setViewVisibility(rows[i], View.GONE)
-                    continue
-                }
+            val xpOf = { entry: JSONObject -> entry.optLong("xp", entry.optLong("week_xp")) }
+            val leaderXp = board.optJSONObject(0)?.let(xpOf)?.coerceAtLeast(1) ?: 1
+            for (i in 0 until board.length()) {
                 val entry = board.getJSONObject(i)
-                val weekXp = entry.getLong("week_xp")
+                val xp = xpOf(entry)
                 val streak = entry.optInt("streak")
-                views.setViewVisibility(rows[i], View.VISIBLE)
+                val views = RemoteViews(context.packageName, style.rowLayout)
                 views.setInt(
-                    rows[i],
+                    R.id.ankiquest_widget_row,
                     "setBackgroundResource",
-                    if (entry.getString("user") == me) R.drawable.ankiquest_widget_row_self else 0,
+                    if (entry.getString("user") == me) style.ownRow else 0,
                 )
-                views.setTextViewText(ranks[i], medals.getOrNull(i) ?: "${i + 1}")
-                views.setTextViewText(names[i], entry.getString("display"))
-                views.setTextViewText(streaks[i], if (streak > 0) "🔥$streak" else "")
-                views.setTextViewText(levels[i], context.getString(R.string.ankiquest_widget_level, entry.getInt("level")))
-                views.setProgressBar(bars[i], 1000, (weekXp * 1000 / leaderXp).toInt(), false)
-                views.setTextViewText(xps[i], numbers.format(weekXp))
+                views.setTextViewText(R.id.ankiquest_widget_rank, medals.getOrNull(i) ?: "${i + 1}")
+                views.setTextViewText(R.id.ankiquest_widget_name, entry.getString("display"))
+                val photo = AnkiquestAvatars.bitmap(entry.getString("user"))
+                val display = entry.getString("display").trim().ifEmpty { entry.getString("user") }
+                val initial = display.take(display.offsetByCodePoints(0, minOf(1, display.codePointCount(0, display.length)))).uppercase()
+                views.setTextViewText(R.id.ankiquest_widget_initial, initial)
+                views.setViewVisibility(R.id.ankiquest_widget_initial, if (photo == null) View.VISIBLE else View.GONE)
+                views.setViewVisibility(R.id.ankiquest_widget_avatar, if (photo == null) View.GONE else View.VISIBLE)
+                views.setImageViewBitmap(R.id.ankiquest_widget_avatar, photo)
+                views.setTextViewText(R.id.ankiquest_widget_streak, if (streak > 0) "🔥$streak" else "")
+                views.setTextViewText(
+                    R.id.ankiquest_widget_level,
+                    context.getString(R.string.ankiquest_widget_level, entry.getInt("level")),
+                )
+                views.setProgressBar(R.id.ankiquest_widget_bar, 1000, (xp * 1000 / leaderXp).toInt(), false)
+                views.setTextViewText(R.id.ankiquest_widget_xp, numbers.format(xp))
+                views.setOnClickFillInIntent(R.id.ankiquest_widget_row, Intent())
+                items.addItem(i.toLong(), views)
             }
+            return items.build()
         }
     }
 }
+
+/** The same leaderboard without a background, drawn straight on the wallpaper. */
+class AnkiquestTransparentWidget : AnkiquestWidget()

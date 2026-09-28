@@ -105,7 +105,6 @@ import com.ichi2.anki.dialogs.DiscardChangesDialog
 import com.ichi2.anki.dialogs.IntegerDialog
 import com.ichi2.anki.dialogs.registerDeckSelectedHandler
 import com.ichi2.anki.dialogs.startDeckSelection
-import com.ichi2.anki.dialogs.tags.TagsDialog
 import com.ichi2.anki.dialogs.tags.TagsDialogFactory
 import com.ichi2.anki.dialogs.tags.TagsDialogListener
 import com.ichi2.anki.exception.toBytesShortString
@@ -218,7 +217,8 @@ class NoteEditorFragment :
     DispatchKeyEventListener,
     MenuProvider,
     ShortcutGroupProvider {
-    private val binding by viewBinding(FragmentNoteEditorBinding::bind)
+    @VisibleForTesting
+    internal val binding by viewBinding(FragmentNoteEditorBinding::bind)
 
     private var bottomInsetPx = 0
 
@@ -1541,7 +1541,7 @@ class NoteEditorFragment :
     }
 
     fun copyNote() {
-        requestAddLauncher.navigate(NoteEditorDestination.CopyNote(deckId, fieldsText, selectedTags))
+        requestAddLauncher.navigate(NoteEditorDestination.CopyNote(deckId, fieldsText, selectedTags.orEmpty()))
     }
 
     // ----------------------------------------------------------------------------
@@ -1686,15 +1686,7 @@ class NoteEditorFragment :
 
     private fun showTagsDialog() {
         val selTags = selectedTags?.let { ArrayList(it) } ?: arrayListOf()
-        val dialog =
-            with(requireContext()) {
-                tagsDialogFactory!!.newTagsDialog().withArguments(
-                    context = this,
-                    type = TagsDialog.DialogType.EDIT_TAGS,
-                    checkedTags = selTags,
-                )
-            }
-        showDialogFragment(dialog)
+        tagsDialogFactory!!.show(requireActivity(), checkedTags = selTags)
     }
 
     override fun onSelectedTags(

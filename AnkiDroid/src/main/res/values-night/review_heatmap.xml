@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="review_heatmap_empty">#323D38</color>
+    <color name="review_heatmap_level_one">#245E3D</color>
+    <color name="review_heatmap_level_two">#398654</color>
+    <color name="review_heatmap_level_three">#60B67A</color>
+    <color name="review_heatmap_level_four">#9ADCAA</color>
+    <color name="review_heatmap_forecast_one">#424C59</color>
+    <color name="review_heatmap_forecast_two">#627080</color>
+    <color name="review_heatmap_forecast_three">#8997A7</color>
+    <color name="review_heatmap_forecast_four">#BAC4CF</color>
+</resources>

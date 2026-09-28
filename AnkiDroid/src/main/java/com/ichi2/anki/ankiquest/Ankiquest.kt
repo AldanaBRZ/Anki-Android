@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Cookie
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -54,6 +55,7 @@ import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
 import java.lang.ref.WeakReference
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.net.UnknownHostException
 import java.util.TimeZone
@@ -63,7 +65,7 @@ import java.util.concurrent.TimeUnit
  * Shows XP, combo, quest and level feedback from an ankiquest server after each answer.
  *
  * With a token, new review log rows are uploaded to the server. Without one, they are only
- * sent to its preview endpoint, which stores nothing.
+ * sent to its preview endpoint, which stores nothing, when the server permits public access.
  */
 object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallbacks {
     const val URL_KEY = "ankiquestUrl"
@@ -71,6 +73,7 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     const val TOKEN_KEY = "ankiquestToken"
     private const val MARK_KEY = "ankiquestUploadedThrough"
     private const val RECENT_KEY = "ankiquestRecentUploads"
+    private const val INITIAL_SYNC_KEY = "ankiquestInitialSyncDone"
 
     private const val MAX_PENDING = 5000
     private const val BASELINE_MAX_AGE_MS = 10 * 60 * 1000L
@@ -89,6 +92,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             .callTimeout(20, TimeUnit.SECONDS)
             .build()
     private val json = "application/json".toMediaType()
+    private val sessionClient =
+        client
+            .newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
 
     private var app: Application? = null
     private var activity = WeakReference<Activity>(null)
@@ -118,8 +127,8 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     /** The player's profile, as served by `/api/profile/<user>`. */
     suspend fun profile(): JSONObject =
         withContext(Dispatchers.IO) {
-            val (url, user) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
-            get("$url/api/profile/$user")
+            val (url, user, token) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
+            get("$url/api/profile/$user", token)
         }
 
     /** The configured player name, or the sync username when none is set. */
@@ -132,28 +141,211 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             .ifEmpty { Prefs.username.orEmpty() }
             .ifEmpty { null }
 
-    private fun endpoint(): Pair<String, String>? {
-        val url =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(URL_KEY, "")
-                .orEmpty()
-                .trim()
-                .trimEnd('/')
-        val user = player()
-        if (url.isEmpty() || user == null) return null
-        return url to URLEncoder.encode(user, "UTF-8").replace("+", "%20")
+    private fun endpoint(): Triple<String, String, String>? {
+        // Keep credentials tied to one server even when settings change during a queued request.
+        val settings = AnkiDroidApp.sharedPrefs().all
+        val url = (settings[URL_KEY] as? String).orEmpty().trim().trimEnd('/')
+        val user = (settings[USER_KEY] as? String).orEmpty().trim().ifEmpty { Prefs.username.orEmpty() }
+        val token = (settings[TOKEN_KEY] as? String).orEmpty().trim()
+        if (url.isEmpty() || user.isEmpty()) return null
+        return Triple(url, URLEncoder.encode(user, "UTF-8").replace("+", "%20"), token)
     }
 
     /** This week's standings, as served by `/api/leaderboard`. */
     suspend fun leaderboard(): JSONArray =
         withContext(Dispatchers.IO) {
-            val (url, _) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
-            client.newCall(Request.Builder().url("$url/api/leaderboard").build()).execute().use { response ->
+            val (url, _, token) = endpoint() ?: throw IllegalStateException("ankiquest is not configured")
+            client.newCall(readRequest("$url/api/leaderboard", token)).execute().use { response ->
                 if (!response.isSuccessful) throw HttpStatusException(response.code)
                 JSONArray(response.body.string())
             }
         }
+
+    /** Silently refresh the complete local catalog before loading private preferences. */
+    suspend fun deckNotificationSettings(): JSONObject =
+        withContext(Dispatchers.IO) {
+            val (url, user, token) = authenticatedEndpoint()
+            mutex.withLock {
+                upload(url, user, token, resync = false, catalog = true)
+                val local =
+                    CollectionManager.withCol {
+                        decks.allNamesAndIds(includeFiltered = false).map { it.id.toString() }.toSet()
+                    }
+                fetchDeckNotificationSettings(url, user, token).also { settings ->
+                    settings.put("decks", JSONArray(settings.getJSONArray("decks").objects().filter { it.getString("id") in local }))
+                }
+            }
+        }
+
+    private fun fetchDeckNotificationSettings(
+        url: String,
+        user: String,
+        token: String,
+    ): JSONObject =
+        execute(
+            Request
+                .Builder()
+                .url("$url/api/decks/$user")
+                .header("Authorization", "Bearer $token")
+                .build(),
+        )
+
+    /** Shares every deck in [shared] with [recipients] and stops sharing [unshared], in one request. */
+    suspend fun saveDeckNotificationSettings(
+        shared: List<String>,
+        unshared: List<String>,
+        recipients: List<String>,
+    ) = withContext(Dispatchers.IO) {
+        val (url, user, token) = authenticatedEndpoint()
+        val decks = JSONArray()
+        for (id in shared) {
+            decks.put(JSONObject().put("id", id).put("enabled", true).put("recipients", JSONArray(recipients)))
+        }
+        for (id in unshared) {
+            decks.put(JSONObject().put("id", id).put("enabled", false).put("recipients", JSONArray()))
+        }
+        execute(
+            Request
+                .Builder()
+                .url("$url/api/decks/$user")
+                .header("Authorization", "Bearer $token")
+                .post(JSONObject().put("decks", decks).toString().toRequestBody(json))
+                .build(),
+        )
+    }
+
+    /** Whether the server sends this player nudges, without touching deck progress. */
+    suspend fun nudgesEnabled(): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            fetchDeckNotificationSettings(url, user, token).getBoolean("nudges")
+        }
+    }
+
+    suspend fun setNudges(enabled: Boolean): JSONObject {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/decks/$user")
+                    .header("Authorization", "Bearer $token")
+                    .post(
+                        JSONObject()
+                            .put("decks", JSONArray())
+                            .put("nudges", enabled)
+                            .toString()
+                            .toRequestBody(json),
+                    ).build(),
+            )
+        }
+    }
+
+    /** Streak protection is stored on the server; never infer it from a local default. */
+    suspend fun streakProtectionEnabled(): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/streak-freezes/$user")
+                    .header("Authorization", "Bearer $token")
+                    .build(),
+            ).getBoolean("enabled")
+        }
+    }
+
+    suspend fun setStreakProtection(enabled: Boolean): Boolean {
+        val (url, user, token) = authenticatedEndpoint()
+        return withContext(Dispatchers.IO) {
+            execute(
+                Request
+                    .Builder()
+                    .url("$url/api/streak-freezes/$user")
+                    .header("Authorization", "Bearer $token")
+                    .post(JSONObject().put("enabled", enabled).toString().toRequestBody(json))
+                    .build(),
+            ).getBoolean("enabled")
+        }
+    }
+
+    /** The ids of every deck nested below the deck called [name] in the settings deck list. */
+    fun subdeckIds(
+        decks: List<JSONObject>,
+        name: String,
+    ): List<String> = decks.filter { it.getString("name").startsWith("$name::") }.map { it.getString("id") }
+
+    /** A reply the server will never take, such as one already answered elsewhere. */
+    class Rejected(
+        val code: Int,
+    ) : IOException("HTTP $code")
+
+    /** Answers one inbox notification; returns the name of whoever will read it. */
+    suspend fun reply(
+        notification: Long,
+        message: String,
+        expectedAccount: String,
+        expectedScope: String,
+    ): String =
+        withContext(Dispatchers.IO) {
+            val account = AnkiquestHomeData.account() ?: throw Rejected(401)
+            if (account.token.isEmpty() || account.notificationAccount != expectedAccount ||
+                account.scope != expectedScope
+            ) {
+                throw Rejected(401)
+            }
+            val request =
+                Request
+                    .Builder()
+                    .url(account.url("api/reply/${account.encodedUser}"))
+                    .header("Authorization", "Bearer ${account.token}")
+                    .post(
+                        JSONObject()
+                            .put("notification", notification)
+                            .put("message", message)
+                            .toString()
+                            .toRequestBody(json),
+                    ).build()
+            try {
+                val recipient = execute(request, sessionClient).getString("sent_to")
+                if (AnkiquestHomeData.account()?.scope != account.scope) throw Rejected(401)
+                recipient
+            } catch (e: HttpStatusException) {
+                throw if (e.code in 400..499) Rejected(e.code) else e
+            }
+        }
+
+    internal data class CompletionNotifications(
+        val account: String,
+        val notifications: JSONArray,
+        val scope: String,
+    )
+
+    /** Preserve the exact fetch identity for both delivery cursors and queued reply actions. */
+    internal suspend fun completionNotifications(): CompletionNotifications? =
+        withContext(Dispatchers.IO) {
+            val account = AnkiquestHomeData.account() ?: return@withContext null
+            if (account.token.isEmpty()) return@withContext null
+            client
+                .newCall(
+                    Request
+                        .Builder()
+                        .url(account.url("api/notifications/${account.encodedUser}"))
+                        .header("Authorization", "Bearer ${account.token}")
+                        .build(),
+                ).execute()
+                .use { response ->
+                    if (!response.isSuccessful) throw HttpStatusException(response.code)
+                    CompletionNotifications(account.notificationAccount, JSONArray(response.body.string()), account.scope)
+                }
+        }
+
+    private fun authenticatedEndpoint(): Triple<String, String, String> {
+        val (url, user, token) = endpoint() ?: throw IllegalStateException("Set the server URL and player first.")
+
+        check(token.isNotEmpty()) { "Set your ankiquest token to manage settings." }
+        return Triple(url, user, token)
+    }
 
     override fun opExecuted(
         changes: OpChanges,
@@ -173,13 +365,8 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         showFeedback: Boolean,
         resync: Boolean = false,
     ) {
-        val (url, user) = endpoint() ?: return
-        val token =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(TOKEN_KEY, "")
-                .orEmpty()
-                .trim()
+        val (url, user, token) = endpoint() ?: return
+
         scope.launch {
             try {
                 mutex.withLock {
@@ -217,9 +404,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         token: String,
         resync: Boolean,
         onlyTest: Boolean = false,
+        catalog: Boolean = false,
     ): JSONObject {
         val prefs = AnkiDroidApp.sharedPrefs()
         val mark = prefs.getLong(MARK_KEY, 0L)
+        val initialSyncKey = "$INITIAL_SYNC_KEY:$url/$user"
+        val initialSyncDone = prefs.getBoolean(initialSyncKey, false)
         var known = if (resync) maxOf(0L, mark - RESYNC_WINDOW_MS) else mark
         val clock = clock()
 
@@ -239,12 +429,32 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             val body =
                 JSONObject()
                     .put("clock", clock)
-                    .put("silent", mark == 0L || full)
+                    .put("silent", catalog || AnkiquestCompletionPolicy.silentUpload(mark, initialSyncDone, full, onlyTest))
             if (first) {
                 restored.forEach { batch.put(it) }
                 body.put("deleted", JSONArray(deleted.toList()))
             }
             body.put("reviews", batch)
+            // Only the final batch represents complete progress; connection checks are not study.
+            if (!full && !onlyTest) {
+                runCatching {
+                    if (catalog) {
+                        deckSnapshots(clock)
+                    } else {
+                        // Fetch for this captured account each time so changed or revoked sharing is respected.
+                        val enabled =
+                            fetchDeckNotificationSettings(url, user, token)
+                                .getJSONArray("decks")
+                                .objects()
+                                .filter { it.getBoolean("enabled") }
+                                .map { it.getString("id") }
+                                .toSet()
+                        if (enabled.isEmpty()) null else JSONArray(deckSnapshots(clock).objects().filter { it.getString("id") in enabled })
+                    }
+                }.onSuccess { decks ->
+                    if (decks != null) body.put("decks", decks).put("catalog", catalog)
+                }.onFailure { Timber.w(it, "ankiquest deck progress unavailable; uploading reviews only") }
+            }
             profile =
                 execute(
                     Request
@@ -257,7 +467,12 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             prefs.edit { putLong(MARK_KEY, maxOf(known, mark)) }
             first = false
         } while (full)
-        if (!onlyTest) prefs.edit { putString(RECENT_KEY, present.joinToString(",")) }
+        if (!onlyTest) {
+            prefs.edit {
+                putString(RECENT_KEY, present.joinToString(","))
+                putBoolean(initialSyncKey, true)
+            }
+        }
         return profile
     }
 
@@ -280,11 +495,28 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         showFeedback: Boolean,
     ) {
         val snapshot = snapshotOf(profile)
-        val message = previous?.let { describe(it, snapshot) }
+        val progress = previous?.let { describe(it, snapshot) }
         previous = snapshot
         app?.let { AnkiquestWidget.requestUpdate(it) }
-        if (showFeedback && message != null) {
+        val announced = announcements(profile)
+        val message =
+            when {
+                announced == null -> progress?.takeIf { showFeedback }
+                progress == null -> announced to true
+                else -> "$announced\n${progress.first}" to true
+            }
+        if (message != null) {
             withContext(Dispatchers.Main) { showBanner(message.first, message.second) }
+        }
+    }
+
+    /** What this upload just told other people about, so finishing a deck is visibly shared. */
+    private fun announcements(profile: JSONObject): String? {
+        val announced = profile.optJSONArray("announced")?.objects().orEmpty()
+        if (announced.isEmpty()) return null
+        return announced.joinToString("\n") {
+            val people = it.getInt("recipients")
+            "\uD83D\uDCE3 ${it.getString("deck")} \u2014 told $people ${if (people == 1) "friend" else "friends"}"
         }
     }
 
@@ -325,15 +557,75 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
             rows
         }
 
-    private fun get(url: String): JSONObject = execute(Request.Builder().url(url).build())
+    private suspend fun deckSnapshots(clock: JSONObject): JSONArray =
+        CollectionManager.withCol {
+            val now = TimeManager.time.intTimeMS()
+            val offset = clock.getInt("offset_west_min")
+            val rollover = clock.getInt("rollover_hour")
+            val rows =
+                AnkiquestDecks.snapshots(
+                    this,
+                    now,
+                    offset,
+                    rollover,
+                )
+            check(AnkiquestDecks.day(now, offset, rollover) == AnkiquestDecks.day(TimeManager.time.intTimeMS(), offset, rollover)) {
+                "Study day changed while reading deck progress"
+            }
+            rows
+        }
 
-    private fun execute(request: Request): JSONObject =
-        client.newCall(request).execute().use { response ->
+    private fun readRequest(
+        url: String,
+        token: String,
+    ): Request =
+        Request
+            .Builder()
+            .url(url)
+            .apply {
+                token.takeIf { it.isNotEmpty() }?.let { header("Authorization", "Bearer $it") }
+            }.build()
+
+    private fun get(
+        url: String,
+        token: String = "",
+    ): JSONObject = execute(readRequest(url, token))
+
+    /** Exchange the configured token for an HttpOnly browser cookie without exposing it to the page. */
+    internal suspend fun dashboardSession(dashboard: String): String? =
+        withContext(Dispatchers.IO) {
+            val (url, user, token) = endpoint() ?: return@withContext null
+            if (dashboard != "$url/#$user") return@withContext null
+            if (token.isEmpty()) return@withContext null
+            val request =
+                Request
+                    .Builder()
+                    .url("$url/auth/session")
+                    .header("Authorization", "Bearer $token")
+                    .post(ByteArray(0).toRequestBody())
+                    .build()
+            sessionClient.newCall(request).execute().use { response ->
+                // Older public servers do not have the session endpoint.
+                if (response.code == 404) return@withContext null
+                if (!response.isSuccessful) throw HttpStatusException(response.code)
+                response.headers.values("Set-Cookie").firstOrNull { value ->
+                    val cookie = Cookie.parse(request.url, value)
+                    cookie != null && cookie.name == "ankiquest_session" && cookie.hostOnly &&
+                        cookie.path == "/" && cookie.httpOnly && (!request.url.isHttps || cookie.secure)
+                } ?: throw IOException("The ankiquest server did not return a valid session cookie")
+            }
+        }
+
+    private fun execute(
+        request: Request,
+        requestClient: OkHttpClient = client,
+    ): JSONObject =
+        requestClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw HttpStatusException(response.code)
             JSONObject(response.body.string())
         }
 
-    private class HttpStatusException(
+    internal class HttpStatusException(
         val code: Int,
     ) : IOException("HTTP $code")
 
@@ -351,20 +643,20 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
         context: Context,
         uploadAll: Boolean,
     ): String {
-        val (url, user) = endpoint() ?: return context.getString(R.string.ankiquest_check_unconfigured)
-        val token =
-            AnkiDroidApp
-                .sharedPrefs()
-                .getString(TOKEN_KEY, "")
-                .orEmpty()
-                .trim()
+        val (url, user, token) = endpoint() ?: return context.getString(R.string.ankiquest_check_unconfigured)
+
         return try {
             mutex.withLock {
                 val profile =
                     if (token.isEmpty()) {
-                        get("$url/api/profile/$user")
+                        get("$url/api/profile/$user", token)
                     } else {
-                        if (uploadAll) AnkiDroidApp.sharedPrefs().edit { remove(MARK_KEY) }
+                        if (uploadAll) {
+                            AnkiDroidApp.sharedPrefs().edit {
+                                remove(MARK_KEY)
+                                remove("$INITIAL_SYNC_KEY:$url/$user")
+                            }
+                        }
                         upload(url, user, token, resync = false, onlyTest = !uploadAll)
                     }
                 present(profile, showFeedback = false)
@@ -471,7 +763,9 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
                 gravity = Gravity.CENTER
                 isClickable = false
                 isFocusable = false
-                importantForAccessibility = TextView.IMPORTANT_FOR_ACCESSIBILITY_NO
+                // Discoverable when navigating with accessibility; the persistent session recap
+                // carries this feedback without interrupting every answer with an announcement.
+                importantForAccessibility = TextView.IMPORTANT_FOR_ACCESSIBILITY_YES
                 val pad = (10 * density).toInt()
                 setPadding(pad * 2, pad, pad * 2, pad)
                 elevation = 8 * density
@@ -503,6 +797,15 @@ object Ankiquest : ChangeManager.Subscriber, Application.ActivityLifecycleCallba
     }
 
     fun dashboardUrl(): String? = endpoint()?.let { (url, user) -> "$url/#$user" }
+
+    internal fun webSession(): AnkiquestWebSession? =
+        endpoint()?.let { (url, user, token) ->
+            AnkiquestWebSession(
+                "$url/#$user",
+                URLDecoder.decode(user, "UTF-8"),
+                token,
+            )
+        }
 
     override fun onActivityResumed(activity: Activity) {
         this.activity = WeakReference(activity)

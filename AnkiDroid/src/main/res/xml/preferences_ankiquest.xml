@@ -3,6 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:title="@string/ankiquest_screen_title"
     android:key="@string/ankiquest_screen_key">
+    <Preference
+        android:key="@string/ankiquest_dashboard_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_dashboard_title" />
     <com.ichi2.preferences.VersatileTextPreference
         android:key="@string/ankiquest_url_key"
         android:title="@string/ankiquest_url_title"
@@ -18,6 +22,21 @@
         android:key="@string/ankiquest_token_key"
         android:title="@string/ankiquest_token_title"
         android:inputType="textPassword" />
+    <Preference
+        android:key="@string/ankiquest_avatar_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_avatar_title"
+        android:summary="@string/ankiquest_avatar_summary" />
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="@string/ankiquest_open_today_key"
+        android:summary="@string/ankiquest_open_today_summary"
+        android:title="@string/ankiquest_open_today_title" />
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="@string/ankiquest_summary_preference_key"
+        android:summary="@string/ankiquest_summary_preference_summary"
+        android:title="@string/ankiquest_summary_preference_title" />
     <SwitchPreferenceCompat
         android:defaultValue="true"
         android:key="@string/ankiquest_notify_rank_key"
@@ -30,6 +49,34 @@
         android:key="@string/ankiquest_streak_hours_key"
         android:title="@string/ankiquest_streak_hours_title"
         app:useSimpleSummaryProvider="true" />
+    <SwitchPreferenceCompat
+        android:key="@string/ankiquest_nudges_key"
+        android:summary="@string/ankiquest_nudges_summary"
+        android:title="@string/ankiquest_nudges_title" />
+    <SwitchPreferenceCompat
+        android:key="@string/ankiquest_streak_protection_key"
+        android:persistent="false"
+        android:summary="@string/ankiquest_streak_protection_summary"
+        android:title="@string/ankiquest_streak_protection_title" />
+    <Preference
+        android:key="@string/ankiquest_community_reminders_key"
+        android:persistent="false"
+        android:summary="@string/ankiquest_community_reminders_summary"
+        android:title="@string/ankiquest_community_reminders_title" />
+    <Preference
+        android:key="@string/ankiquest_message_alerts_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_message_alerts_title"
+        android:summary="@string/ankiquest_alerts_summary" />
+    <Preference
+        android:key="@string/ankiquest_nudge_alerts_key"
+        android:persistent="false"
+        android:title="@string/ankiquest_nudge_alerts_title"
+        android:summary="@string/ankiquest_alerts_summary" />
+    <Preference
+        android:key="@string/ankiquest_deck_notifications_key"
+        android:title="@string/ankiquest_deck_notifications_title"
+        android:summary="@string/ankiquest_deck_notifications_summary" />
     <Preference
         android:key="@string/ankiquest_test_key"
         android:title="@string/ankiquest_test_title"

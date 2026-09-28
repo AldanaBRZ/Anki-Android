@@ -26,6 +26,7 @@ A semi-official port of the open source [Anki](https://apps.ankiweb.net/index.ht
 - Whiteboard 
 - Progress widget
 - Detailed statistics
+- [Review heatmap beneath the deck list](docs/review-heatmap.md)
 - Syncing with AnkiWeb
 - Write answers (optional)
 - Text-to-speech integration

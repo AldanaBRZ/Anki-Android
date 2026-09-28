@@ -100,12 +100,13 @@ class DeckAdapter(
     fun submit(
         data: List<DisplayDeckNode>,
         hasSubDecks: Boolean,
+        onListCommitted: (() -> Unit)? = null,
     ) {
         // force refresh when sub decks status changes as this info isn't encapsulated in the
         // adapter's items so there wouldn't be an ui refresh just from using submitList()
         val forceRefresh = this.hasSubdecks != hasSubDecks
         this.hasSubdecks = hasSubDecks
-        submitList(data)
+        submitList(data) { onListCommitted?.invoke() }
         if (forceRefresh) notifyDataSetChanged()
     }
 
@@ -144,7 +145,6 @@ class DeckAdapter(
         if (node.canCollapse) {
             binding.deckExpander.setOnClickListener {
                 onDeckChildrenToggled(node.did)
-                notifyItemChanged(position) // Ensure UI updates
             }
         } else {
             binding.deckExpander.isClickable = false
@@ -274,9 +274,10 @@ private val deckNodeDiffCallback =
             newItem: DisplayDeckNode,
         ): Boolean = oldItem == newItem
 
-        // We have to return a non-null payload to prevent cross-fading which resulted in the doubling of the chevron
+        // Reuse rows for expand/collapse updates to avoid cross-fading different chevrons.
+        // Selection changes need a new row: replacing the background of a pressed row restarts its ripple.
         override fun getChangePayload(
             oldItem: DisplayDeckNode,
             newItem: DisplayDeckNode,
-        ): Any = true
+        ): Any? = if (oldItem.isSelected != newItem.isSelected) null else true
     }

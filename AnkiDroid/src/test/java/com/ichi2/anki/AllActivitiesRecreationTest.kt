@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.core.content.edit
 import com.ichi2.anki.account.AccountActivity
 import com.ichi2.anki.ankiquest.AnkiquestActivity
+import com.ichi2.anki.ankiquest.AnkiquestWidgetConfig
 import com.ichi2.anki.common.preferences.sharedPrefs
 import com.ichi2.anki.multimedia.MultimediaActivity
 import com.ichi2.anki.preferences.PreferencesActivity
@@ -161,6 +162,7 @@ class AllActivitiesRecreationTest : RobolectricTest() {
         private val finishesDuringStartup =
             listOf(
                 AnkiquestActivity::class.java,
+                AnkiquestWidgetConfig::class.java,
                 CardAnalysisWidgetConfig::class.java,
                 DeckPickerWidgetConfig::class.java,
                 NoteTypeFieldEditor::class.java,

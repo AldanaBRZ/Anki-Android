@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPDX-FileCopyrightText: Copyright (c) 2023 Brayan Oliveira <brayandso.dev@gmail.com>
 
 package com.ichi2.anki.analytics
 
@@ -7,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.EmptyApplicationCategory
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.ankiquest.AnkiquestNavigation
 import com.ichi2.anki.preferences.PreferenceTestUtils
 import com.ichi2.anki.preferences.SettingsFragment
 import com.ichi2.testutils.EmptyApplication
@@ -103,9 +103,18 @@ class PreferencesAnalyticsTest : RobolectricTest() {
             R.string.ankiquest_test_key,
             R.string.ankiquest_upload_all_key,
             R.string.ankiquest_check_updates_key,
+            R.string.ankiquest_deck_notifications_key,
+            R.string.ankiquest_avatar_key,
             R.string.ankiquest_notify_rank_key,
             R.string.ankiquest_streak_hours_key,
-        ).toStringResourceSet()
+            R.string.ankiquest_nudges_key,
+            R.string.ankiquest_message_alerts_key,
+            R.string.ankiquest_nudge_alerts_key,
+            R.string.ankiquest_dashboard_key,
+            R.string.ankiquest_community_reminders_key,
+            R.string.ankiquest_streak_protection_key,
+        ).toStringResourceSet() +
+            setOf(AnkiquestNavigation.OPEN_TODAY_KEY, AnkiquestNavigation.SESSION_SUMMARY_KEY)
 
     @Test
     fun `The include and excluded prefs lists don't share elements`() {

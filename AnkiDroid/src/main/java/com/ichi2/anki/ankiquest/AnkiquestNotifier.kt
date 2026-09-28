@@ -20,12 +20,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.work.Data
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.R
 import com.ichi2.anki.common.time.TimeManager
@@ -43,12 +46,65 @@ object AnkiquestNotifier {
     const val DEFAULT_STREAK_HOURS = "2"
 
     private const val CHANNEL = "ankiquest"
+
+    /** Keep nudges independently configurable, including channels saved by older versions. */
+    private const val NUDGE_CHANNEL = "ankiquestNudges"
+    private val BUZZ = longArrayOf(0, 250, 150, 250)
     private const val ORDER_KEY = "ankiquestLastOrder"
     private const val STREAK_DAY_KEY = "ankiquestStreakNotifiedDay"
     private const val RANK_ID = 5_130_001
     private const val STREAK_ID = 5_130_002
     private const val HOUR_MS = 60 * 60 * 1000L
     private const val DAY_MS = 24 * HOUR_MS
+
+    @Synchronized
+    fun onDeckCompletions(
+        context: Context,
+        account: String,
+        notifications: JSONArray,
+        scope: String? = null,
+    ) {
+        if (scope != null && AnkiquestHomeData.account()?.scope != scope) return
+        val prefs = AnkiDroidApp.sharedPrefs()
+        val key = "ankiquestCompletionCursor:$account"
+        val firstPollKey = "ankiquestCompletionFirstPollAt:$account"
+        val entries = (0 until notifications.length()).map { notifications.getJSONObject(it) }.sortedBy { it.getLong("id") }
+        var previous = prefs.getLong(key, 0L)
+        // Only discard an old backlog on first contact. Unseen messages must not
+        // age out while offline or waiting for notification permission.
+        val firstPoll =
+            if (prefs.contains(firstPollKey)) {
+                prefs.getLong(firstPollKey, 0L)
+            } else {
+                val start = if (prefs.contains(key)) 0L else TimeManager.time.intTimeMS() / 1000
+                prefs.edit { putLong(firstPollKey, start) }
+                start
+            }
+        for (entry in entries) {
+            val id = entry.getLong("id")
+            if (id <= previous) continue
+            val fresh = AnkiquestCompletionPolicy.freshNotification(entry.optLong("created_at"), firstPoll)
+            val tag = 5_140_000 + (id % 1_000_000).toInt()
+            val title = entry.getString("title")
+            val body = entry.getString("body")
+            val answerable = entry.optString("sender").isNotEmpty() && !entry.optBoolean("replied")
+            if (fresh &&
+                notify(
+                    context,
+                    tag,
+                    title,
+                    body,
+                    notificationIntent(context, entry, account),
+                    if (answerable) AnkiquestReply.actions(context, id, tag, title, body, account, scope) else emptyList(),
+                    entry.optString("kind") == "nudge",
+                ) == Delivery.DISABLED
+            ) {
+                return
+            }
+            previous = id
+            prefs.edit { putLong(key, previous) }
+        }
+    }
 
     fun onLeaderboard(
         context: Context,
@@ -88,7 +144,15 @@ object AnkiquestNotifier {
                 val title = if (before == 0) "👑 $who took the crown" else "▼ $who passed you"
                 title to "You're now #${rank + 1}.$gap"
             }
-        notify(context, RANK_ID, title, body.trim(), dashboardIntent(context))
+        notify(
+            context,
+            RANK_ID,
+            title,
+            body.trim(),
+            Intent(context, AnkiquestActivity::class.java)
+                .putExtra(AnkiquestActivity.EXTRA_PATH, "/week")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     fun onProfile(
@@ -106,23 +170,134 @@ object AnkiquestNotifier {
         if (remaining > hours * HOUR_MS) return
         val day = sinceRollover.floorDiv(DAY_MS)
         if (prefs.getLong(STREAK_DAY_KEY, Long.MIN_VALUE) == day) return
-        prefs.edit { putLong(STREAK_DAY_KEY, day) }
 
         val streak = profile.optInt("streak")
         val left = ceil(remaining.toDouble() / HOUR_MS).toInt()
         val freezes = profile.optInt("freezes")
         val body =
             if (freezes > 0) {
-                "Review a few cards to keep it. A freeze would cover you, but why spend it?"
+                context.getString(R.string.ankiquest_streak_protected)
             } else {
-                "Review a few cards to keep it. No freezes left."
+                context.getString(R.string.ankiquest_streak_gentle)
             }
         val open = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        notify(context, STREAK_ID, "🔥 Your $streak day streak ends in ${left}h", body, open)
+        if (notify(context, STREAK_ID, "🔥 Your $streak day streak ends in ${left}h", body, open) != Delivery.DISABLED) {
+            prefs.edit { putLong(STREAK_DAY_KEY, day) }
+        }
     }
 
-    private fun dashboardIntent(context: Context): Intent =
-        Intent(context, AnkiquestActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /** Replaces the answered notification with what was said, so the reply is visibly gone. */
+    fun onReplySent(
+        context: Context,
+        data: Data,
+        who: String,
+    ) {
+        if (!AnkiquestReply.current(data)) return
+        val message = data.getString(AnkiquestReply.MESSAGE_KEY).orEmpty()
+        notify(
+            context,
+            data.getInt(AnkiquestReply.TAG_KEY, 0),
+            data.getString(AnkiquestReply.TITLE_KEY).orEmpty(),
+            context.getString(R.string.ankiquest_reply_sent, who, message),
+            replyIntent(context, data),
+            silent = true,
+        )
+    }
+
+    /** Keeps the buttons so a reply that never left can be sent again. */
+    fun onReplyFailed(
+        context: Context,
+        data: Data,
+    ) {
+        if (!AnkiquestReply.current(data)) return
+        val tag = data.getInt(AnkiquestReply.TAG_KEY, 0)
+        val title = data.getString(AnkiquestReply.TITLE_KEY).orEmpty()
+        val body = data.getString(AnkiquestReply.BODY_KEY).orEmpty()
+        val message = data.getString(AnkiquestReply.MESSAGE_KEY).orEmpty()
+        notify(
+            context,
+            tag,
+            title,
+            context.getString(R.string.ankiquest_reply_failed, message),
+            replyIntent(context, data),
+            AnkiquestReply.actions(
+                context,
+                data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0),
+                tag,
+                title,
+                body,
+                data.getString(AnkiquestReply.ACCOUNT_KEY),
+                data.getString(AnkiquestReply.SCOPE_KEY),
+            ),
+            silent = true,
+        )
+    }
+
+    private fun replyIntent(
+        context: Context,
+        data: Data,
+    ): Intent =
+        AnkiquestHomeActivity
+            .intent(
+                context,
+                "activity",
+                notificationId = data.getLong(AnkiquestReply.NOTIFICATION_KEY, 0).takeIf { it > 0 },
+            ).putExtra(AnkiquestHomeActivity.EXTRA_ACCOUNT, data.getString(AnkiquestReply.ACCOUNT_KEY))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** IDs are routed natively; server-supplied URLs never become arbitrary app destinations. */
+    internal fun notificationIntent(
+        context: Context,
+        entry: JSONObject,
+        account: String,
+    ): Intent =
+        AnkiquestHomeActivity
+            .intent(
+                context,
+                if (entry.optLong("challenge_id") > 0) "friends" else "activity",
+                entry.optLong("challenge_id").takeIf { it > 0 },
+                entry.optLong("id").takeIf { it > 0 },
+            ).putExtra(AnkiquestHomeActivity.EXTRA_ACCOUNT, account)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Existing channel behavior belongs to Android settings, not app updates. */
+    fun alertSettingsIntent(
+        context: Context,
+        nudge: Boolean,
+    ): Intent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = ensureChannel(context, nudge)
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, channel)
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+        }
+
+    private fun ensureChannel(
+        context: Context,
+        nudge: Boolean,
+    ): String {
+        val channel = if (nudge) NUDGE_CHANNEL else CHANNEL
+        val manager = NotificationManagerCompat.from(context)
+        if (manager.getNotificationChannel(channel) == null) {
+            manager.createNotificationChannel(
+                NotificationChannelCompat
+                    .Builder(channel, NotificationManagerCompat.IMPORTANCE_HIGH)
+                    .setName(context.getString(if (nudge) R.string.ankiquest_nudges_title else R.string.ankiquest_screen_title))
+                    .setVibrationEnabled(true)
+                    .setVibrationPattern(BUZZ)
+                    .build(),
+            )
+        }
+        return channel
+    }
+
+    private enum class Delivery {
+        POSTED,
+        CHANNEL_BLOCKED,
+        DISABLED,
+    }
 
     @SuppressLint("MissingPermission")
     private fun notify(
@@ -131,27 +306,35 @@ object AnkiquestNotifier {
         title: String,
         body: String,
         open: Intent,
-    ) {
+        actions: List<NotificationCompat.Action> = emptyList(),
+        nudge: Boolean = false,
+        silent: Boolean = false,
+    ): Delivery {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
-            return
+            return Delivery.DISABLED
         }
         val manager = NotificationManagerCompat.from(context)
-        manager.createNotificationChannel(
-            NotificationChannelCompat
-                .Builder(CHANNEL, NotificationManagerCompat.IMPORTANCE_DEFAULT)
-                .setName(context.getString(R.string.ankiquest_screen_title))
-                .build(),
-        )
+        if (!manager.areNotificationsEnabled()) return Delivery.DISABLED
+        val channel = ensureChannel(context, nudge)
+        if (manager.getNotificationChannel(channel)?.importance == NotificationManagerCompat.IMPORTANCE_NONE) {
+            return Delivery.CHANNEL_BLOCKED
+        }
         val notification =
             NotificationCompat
-                .Builder(context, CHANNEL)
+                .Builder(context, channel)
                 .setSmallIcon(R.drawable.ic_star_notify)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setAutoCancel(true)
+                // Before channels, Android reads alert behavior from the notification.
+                // The system still applies the phone's ringer and Do Not Disturb settings.
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_SOUND)
+                .setVibrate(BUZZ)
+                .setSilent(silent)
                 .setContentIntent(
                     PendingIntent.getActivity(
                         context,
@@ -159,7 +342,14 @@ object AnkiquestNotifier {
                         open,
                         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                     ),
-                ).build()
-        manager.notify(id, notification)
+                ).apply { actions.forEach { addAction(it) } }
+                .build()
+        return try {
+            manager.notify(id, notification)
+            Delivery.POSTED
+        } catch (_: SecurityException) {
+            // Permission may be revoked after the check above. Keep the inbox pending.
+            Delivery.DISABLED
+        }
     }
 }

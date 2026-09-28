@@ -1,5 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="ankiquest_dashboard_key" translatable="false">ankiquestDashboard</string>
+    <string name="ankiquest_dashboard_title" translatable="false" maxLength="41">Leaderboard</string>
+    <string name="ankiquest_community_reminders_key" translatable="false">ankiquestCommunityReminders</string>
+    <string name="ankiquest_community_reminders_title" translatable="false" maxLength="41">Community reminders</string>
+    <string name="ankiquest_community_reminders_summary" translatable="false">Choose reminders for community events</string>
+    <string name="ankiquest_streak_protection_key" translatable="false">ankiquestStreakProtection</string>
+    <string name="ankiquest_streak_protection_title" translatable="false" maxLength="41">Streak protection</string>
+    <string name="ankiquest_streak_protection_summary" translatable="false">Off by default. After opting in, finish all three daily quests to earn one freeze per Anki day, up to 3. One is used automatically for each ended day without reviews. Turning this off pauses earning and use; saved freezes stay.</string>
+    <string name="ankiquest_avatar_key" translatable="false">ankiquestAvatar</string>
+    <string name="ankiquest_avatar_title" translatable="false" maxLength="41">Profile picture</string>
+    <string name="ankiquest_avatar_summary" translatable="false">Choose a picture for your profile, leaderboard and widgets</string>
+    <string name="ankiquest_avatar_choose" translatable="false">Choose picture</string>
+    <string name="ankiquest_avatar_remove" translatable="false">Remove picture</string>
+    <string name="ankiquest_avatar_remove_confirm" translatable="false">Remove your profile picture and use your initial again?</string>
+    <string name="ankiquest_deck_notifications_key" translatable="false">ankiquestDeckNotifications</string>
+    <string name="ankiquest_deck_notifications_title" translatable="false" maxLength="41">Deck completion notifications</string>
+    <string name="ankiquest_deck_notifications_summary" translatable="false">Choose who hears when you finish a deck for the day</string>
+    <string name="ankiquest_deck_notifications_empty" translatable="false">Create a regular deck first to set up completion notifications.</string>
+    <string name="ankiquest_deck_notifications_no_people" translatable="false">There are no other players on this server yet.</string>
+    <string name="ankiquest_deck_notifications_choose_people" translatable="false">Select at least one person, or switch sharing off.</string>
+    <string name="ankiquest_deck_notifications_save" translatable="false">Save</string>
+    <string name="ankiquest_reply" translatable="false">Reply</string>
+    <string name="ankiquest_nudges_key" translatable="false">ankiquestNudges</string>
+    <string name="ankiquest_nudges_title" translatable="false" maxLength="41">Nudges</string>
+    <string name="ankiquest_nudges_summary" translatable="false">Tell me when a place, my best day or the next level is within reach</string>
+    <string name="ankiquest_nudges_unavailable" translatable="false">Set the server, player and token first</string>
+    <string name="ankiquest_message_alerts_key" translatable="false">ankiquestMessageAlerts</string>
+    <string name="ankiquest_nudge_alerts_key" translatable="false">ankiquestNudgeAlerts</string>
+    <string name="ankiquest_message_alerts_title" translatable="false" maxLength="41">Message and study alerts</string>
+    <string name="ankiquest_nudge_alerts_title" translatable="false" maxLength="41">Nudge alerts</string>
+    <string name="ankiquest_alerts_summary" translatable="false">Choose sound, vibration and pop-up banners in Android settings</string>
+    <string name="ankiquest_deck_collapse" translatable="false">Collapse subdecks</string>
+    <string name="ankiquest_deck_expand" translatable="false">Expand subdecks</string>
+    <string name="ankiquest_deck_apply_subdecks" translatable="false">Apply to subdecks</string>
+    <string name="ankiquest_reply_cheer" translatable="false">Good job!</string>
+    <string name="ankiquest_reply_hint" translatable="false">Say something nice</string>
+    <string name="ankiquest_reply_sent" translatable="false">Sent to %1$s: %2$s</string>
+    <string name="ankiquest_reply_failed" translatable="false">Could not send \u201c%1$s\u201d. Tap a button to try again.</string>
+    <string-array name="ankiquest_reply_choices" translatable="false">
+        <item>Nice one \ud83d\udd25</item>
+        <item>Keep it up!</item>
+    </string-array>
+    <string name="ankiquest_deck_notifications_next" translatable="false">Next</string>
+    <string name="ankiquest_deck_notifications_select_all" translatable="false">All / none</string>
+    <string name="ankiquest_deck_notifications_people_title" translatable="false">Notify these people</string>
+    <plurals name="ankiquest_deck_notifications_saved" translatable="false">
+        <item quantity="zero">No decks are shared any more.</item>
+        <item quantity="one">%d deck is shared.</item>
+        <item quantity="other">%d decks are shared.</item>
+    </plurals>
     <string name="ankiquest_screen_key" translatable="false">ankiquestScreen</string>
     <string name="ankiquest_screen_title" translatable="false" maxLength="41">ankiquest</string>
     <string name="ankiquest_menu_title" translatable="false" maxLength="28">ankiquest</string>
@@ -17,7 +67,7 @@
     <string name="ankiquest_upload_all_summary" translatable="false">Send your whole review history. Already uploaded reviews are skipped by the server.</string>
     <string name="ankiquest_check_running" translatable="false">Contacting the server…</string>
     <string name="ankiquest_check_ok" translatable="false">Connected as %1$s: level %2$d, %3$d XP, %4$d reviews on the server.</string>
-    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored.</string>
+    <string name="ankiquest_check_no_token" translatable="false">No token is set, so reviews are only previewed and not stored. Private servers require your member token.</string>
     <string name="ankiquest_check_unconfigured" translatable="false">Set the server URL and player first.</string>
     <string name="ankiquest_check_unauthorized" translatable="false">The server rejected the player or token. Check both for typos.</string>
     <string name="ankiquest_check_unknown_player" translatable="false">The server does not know this player yet. Set the token so your reviews can be uploaded.</string>
@@ -26,6 +76,8 @@
     <string name="ankiquest_check_bad_url" translatable="false">%1$s is not a valid URL. It should look like https://anki.example.com</string>
     <string name="ankiquest_check_failed" translatable="false">Could not reach the server: %1$s</string>
     <string name="ankiquest_widget_label" translatable="false">ankiquest leaderboard</string>
+    <string name="ankiquest_widget_transparent_label" translatable="false">ankiquest leaderboard (transparent)</string>
+    <string name="ankiquest_widget_transparent_description" translatable="false">This week\'s ankiquest leaderboard without a background</string>
     <string name="ankiquest_widget_description" translatable="false">This week\'s ankiquest leaderboard</string>
     <string name="ankiquest_widget_level" translatable="false">Lv %1$d</string>
     <string name="ankiquest_widget_unconfigured" translatable="false">Set up ankiquest in Settings</string>
@@ -58,7 +110,13 @@
         <item>4</item>
         <item>6</item>
     </string-array>
-    <string name="ankiquest_widget_this_week" translatable="false">this week</string>
+    <string name="ankiquest_period_hour" translatable="false">this hour</string>
+    <string name="ankiquest_period_day" translatable="false">today</string>
+    <string name="ankiquest_period_week" translatable="false">this week</string>
+    <string name="ankiquest_period_month" translatable="false">this month</string>
+    <string name="ankiquest_period_year" translatable="false">this year</string>
+    <string name="ankiquest_period_all" translatable="false">all time</string>
+    <string name="ankiquest_widget_period_title" translatable="false">Which leaderboard?</string>
     <string name="ankiquest_widget_refresh" translatable="false">Refresh</string>
     <string name="ankiquest_widget_offline_at" translatable="false">offline · %1$s</string>
     <string name="ankiquest_update_title" translatable="false">%1$s available</string>

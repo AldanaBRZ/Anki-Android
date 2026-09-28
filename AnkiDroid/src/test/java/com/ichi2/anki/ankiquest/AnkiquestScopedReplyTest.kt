@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package com.ichi2.anki.ankiquest
+
+import android.app.NotificationManager
+import android.content.Intent
+import androidx.core.content.edit
+import androidx.core.content.getSystemService
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Data
+import com.ichi2.anki.AnkiDroidApp
+import com.ichi2.anki.EmptyApplicationCategory
+import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.common.preferences.sharedPrefs
+import com.ichi2.testutils.EmptyApplication
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
+import org.json.JSONObject
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.experimental.categories.Category
+import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import java.net.InetSocketAddress
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+@RunWith(AndroidJUnit4::class)
+@Config(application = EmptyApplication::class, sdk = [32])
+@Category(EmptyApplicationCategory::class)
+class AnkiquestScopedReplyTest : RobolectricTest() {
+    private lateinit var server: HttpServer
+    private lateinit var captured: HomeAccount
+    private val requests = CopyOnWriteArrayList<Pair<String, String?>>()
+
+    @Volatile private var switchDuringResponse = false
+
+    @Volatile private var redirect = false
+
+    @Before
+    fun prepare() {
+        AnkiDroidApp.sharedPreferencesTestingOverride = targetContext.sharedPrefs()
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            requests += exchange.requestURI.path to exchange.requestHeaders.getFirst("Authorization")
+            exchange.requestBody.close()
+            if (switchDuringResponse) AnkiDroidApp.sharedPrefs().edit { putString(Ankiquest.USER_KEY, "bob") }
+            if (redirect) exchange.responseHeaders.set("Location", "/other-destination")
+            val response = "{\"sent_to\":\"Friend\"}".toByteArray()
+            exchange.sendResponseHeaders(if (redirect) 307 else 200, response.size.toLong())
+            exchange.responseBody.use { it.write(response) }
+            exchange.close()
+        }
+        server.start()
+        AnkiDroidApp.sharedPrefs().edit {
+            putString(Ankiquest.URL_KEY, "http://127.0.0.1:${server.address.port}")
+            putString(Ankiquest.USER_KEY, "alice")
+            putString(Ankiquest.TOKEN_KEY, "alice-test-token")
+        }
+        captured = AnkiquestHomeData.account()!!
+    }
+
+    @After
+    fun stop() {
+        server.stop(0)
+        AnkiDroidApp.sharedPreferencesTestingOverride = null
+    }
+
+    private fun replyData(): Data =
+        AnkiquestReply.data(
+            Intent()
+                .putExtra(AnkiquestReply.NOTIFICATION_KEY, 7L)
+                .putExtra(AnkiquestReply.TAG_KEY, 5_140_007)
+                .putExtra(AnkiquestReply.ACCOUNT_KEY, captured.notificationAccount)
+                .putExtra(AnkiquestReply.SCOPE_KEY, captured.scope),
+            "Well done",
+        )
+
+    @Test
+    fun `reply carries captured owner credentials and never persists the token`() =
+        runBlocking {
+            val data = replyData()
+            assertEquals(captured.scope, data.getString(AnkiquestReply.SCOPE_KEY))
+            assertFalse(data.toString().contains(captured.token))
+            assertEquals("Friend", Ankiquest.reply(7, "Well done", captured.notificationAccount, captured.scope))
+            assertEquals(listOf("/api/reply/alice" to "Bearer alice-test-token"), requests.toList())
+        }
+
+    @Test
+    fun `missing owner metadata and changed account or credentials never send`() =
+        runBlocking {
+            val missing =
+                Data
+                    .Builder()
+                    .putLong(AnkiquestReply.NOTIFICATION_KEY, 7L)
+                    .putString(AnkiquestReply.MESSAGE_KEY, "Well done")
+                    .build()
+            assertEquals(AnkiquestReply.Outcome.FAILED, AnkiquestReply.run(targetContext, missing, 0))
+            val original = AnkiDroidApp.sharedPrefs().all
+            for ((key, value) in listOf(
+                Ankiquest.USER_KEY to "bob",
+                Ankiquest.TOKEN_KEY to "new-token",
+                Ankiquest.URL_KEY to "http://127.0.0.1:9",
+            )) {
+                AnkiDroidApp.sharedPrefs().edit { putString(key, value) }
+                assertEquals(AnkiquestReply.Outcome.FAILED, AnkiquestReply.run(targetContext, replyData(), 0))
+                assertFailsWith<Ankiquest.Rejected> { Ankiquest.reply(7, "Well done", captured.notificationAccount, captured.scope) }
+                AnkiDroidApp.sharedPrefs().edit { putString(key, original[key] as String) }
+            }
+            assertTrue(requests.isEmpty())
+        }
+
+    @Test
+    fun `a midflight switch cannot change the request owner or publish its response to the next account`() =
+        runBlocking {
+            switchDuringResponse = true
+            val manager = targetContext.getSystemService<NotificationManager>()!!
+            manager.cancelAll()
+            assertEquals(AnkiquestReply.Outcome.FAILED, AnkiquestReply.run(targetContext, replyData(), 0))
+            assertEquals(listOf("/api/reply/alice" to "Bearer alice-test-token"), requests.toList())
+            assertEquals(0, shadowOf(manager).size())
+            AnkiquestNotifier.onDeckCompletions(
+                targetContext,
+                captured.notificationAccount,
+                JSONArray().put(JSONObject().put("id", 8)),
+                captured.scope,
+            )
+            assertEquals(0, shadowOf(manager).size())
+            assertFalse(AnkiDroidApp.sharedPrefs().contains("ankiquestCompletionCursor:${captured.notificationAccount}"))
+        }
+
+    @Test
+    fun `a reply redirect cannot forward the message to a new destination`() =
+        runBlocking {
+            redirect = true
+            assertFailsWith<Ankiquest.HttpStatusException> { Ankiquest.reply(7, "Well done", captured.notificationAccount, captured.scope) }
+            assertEquals(1, requests.size)
+            assertEquals("/api/reply/alice", requests.single().first)
+        }
+}
