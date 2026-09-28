@@ -4,7 +4,7 @@
     <string name="ankiquest_community_reminders_title">Rappels communautaires</string>
     <string name="ankiquest_community_reminders_summary">Choisir des rappels pour les événements communautaires</string>
     <string name="ankiquest_streak_protection_title">Protection de série</string>
-    <string name="ankiquest_streak_protection_summary">Désactivée par défaut. Une fois activée, termine les trois missions quotidiennes pour gagner un gel de série par jour Anki, jusqu’à 3. Un gel protège automatiquement chaque jour terminé sans révisions. La désactivation suspend le gain et l’utilisation, mais conserve les gels gagnés.</string>
+    <string name="ankiquest_streak_protection_summary">Activée par défaut. Termine les trois missions quotidiennes pendant que la protection est active pour gagner un gel de série par jour Anki, jusqu’à 3. Un gel protège automatiquement chaque jour terminé sans révisions. La désactivation suspend le gain et l’utilisation, mais conserve les gels gagnés.</string>
     <string name="ankiquest_avatar_title">Photo de profil</string>
     <string name="ankiquest_avatar_summary">Choisis une photo pour ton profil, le classement et les widgets.</string>
     <string name="ankiquest_avatar_choose">Choisir l\'image</string>
@@ -19,6 +19,8 @@
     <string name="ankiquest_reply">Réponse</string>
     <string name="ankiquest_nudges_title">Coups de pouce</string>
     <string name="ankiquest_nudges_summary">Préviens-moi quand une place, mon meilleur jour ou le prochain niveau est à portée</string>
+    <string name="ankiquest_celebrations_title">Célébrations</string>
+    <string name="ankiquest_celebrations_summary">Félicite-moi pour mes réussites, les étapes de ma série et mes records personnels</string>
     <string name="ankiquest_nudges_unavailable">Configure d’abord le serveur, le joueur et le jeton</string>
     <string name="ankiquest_message_alerts_title">Alertes de messages et d’étude</string>
     <string name="ankiquest_nudge_alerts_title">Alertes de coups de pouce</string>

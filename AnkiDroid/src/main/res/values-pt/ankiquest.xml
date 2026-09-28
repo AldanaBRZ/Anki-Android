@@ -4,7 +4,7 @@
     <string name="ankiquest_community_reminders_title">Avisos comunitários</string>
     <string name="ankiquest_community_reminders_summary">Escolha lembretes para eventos comunitários</string>
     <string name="ankiquest_streak_protection_title">Proteção de sequência</string>
-    <string name="ankiquest_streak_protection_summary">Desativada por predefinição. Depois de ativada, conclui as três missões diárias para ganhares uma proteção por dia Anki, até 3. Uma é usada automaticamente por cada dia sem revisões. Ao desativar, deixas de ganhar e usar proteções, mas conservas as guardadas.</string>
+    <string name="ankiquest_streak_protection_summary">Ativada por predefinição. Conclui as três missões diárias enquanto a proteção estiver ativa para ganhares uma proteção por dia Anki, até 3. Uma é usada automaticamente por cada dia sem revisões. Ao desativar, deixas de ganhar e usar proteções, mas conservas as guardadas.</string>
     <string name="ankiquest_avatar_title">Imagem do perfil</string>
     <string name="ankiquest_avatar_summary">Escolhe uma imagem para o teu perfil, a classificação e os widgets.</string>
     <string name="ankiquest_avatar_choose">Escolher imagem</string>
@@ -19,6 +19,8 @@
     <string name="ankiquest_reply">Responder</string>
     <string name="ankiquest_nudges_title">Lembretes</string>
     <string name="ankiquest_nudges_summary">Avisa-me quando uma posição, o meu melhor dia ou o próximo nível estiver ao alcance</string>
+    <string name="ankiquest_celebrations_title">Celebrações</string>
+    <string name="ankiquest_celebrations_summary">Felicita-me por conquistas, marcos da sequência e recordes pessoais</string>
     <string name="ankiquest_nudges_unavailable">Configura primeiro o servidor, o jogador e o token</string>
     <string name="ankiquest_message_alerts_title">Alertas de mensagens e de estudo</string>
     <string name="ankiquest_nudge_alerts_title">Alertas de lembrete</string>

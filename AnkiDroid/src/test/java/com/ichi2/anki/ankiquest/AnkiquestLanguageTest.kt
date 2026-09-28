@@ -51,6 +51,8 @@ class AnkiquestLanguageTest : RobolectricTest() {
                 "Quel classement ?",
                 "Rappel de série",
                 "Je m’en occupe !",
+                "Aki est là pour t’aider. Une carte, un petit pas.",
+                "Célébrations",
             ),
             listOf(
                 "de-DE",
@@ -60,6 +62,8 @@ class AnkiquestLanguageTest : RobolectricTest() {
                 "Welche Rangliste?",
                 "Lernserien-Erinnerung",
                 "Ich kümmere mich darum!",
+                "Aki hilft dir. Eine Karte, ein kleiner Schritt.",
+                "Erfolge feiern",
             ),
             listOf(
                 "pt-PT",
@@ -69,11 +73,15 @@ class AnkiquestLanguageTest : RobolectricTest() {
                 "Qual classificação?",
                 "Lembrete da sequência",
                 "Já trato disso!",
+                "Aki está aqui para te ajudar. Um cartão, um pequeno passo.",
+                "Celebrações",
             ),
         )) {
             val (tag, friends, done, health, widget) = expected
             val reminder = expected[5]
             val reply = expected[6]
+            val aki = expected[7]
+            val celebrations = expected[8]
             AnkiDroidApp.sharedPrefs().edit { putString("language", tag) }
             val localized = AnkiquestLanguage.context(targetContext)
             assertEquals(friends, localized.getString(R.string.ankiquest_nav_friends))
@@ -82,6 +90,8 @@ class AnkiquestLanguageTest : RobolectricTest() {
             assertEquals(widget, localized.getString(R.string.ankiquest_widget_period_title))
             assertEquals(reminder, localized.getString(R.string.ankiquest_streak_hours_title))
             assertEquals(reply, localized.getString(R.string.ankiquest_reply_on_it))
+            assertEquals(aki, localized.getString(R.string.aki_welcome))
+            assertEquals(celebrations, localized.getString(R.string.ankiquest_celebrations_title))
         }
     }
 

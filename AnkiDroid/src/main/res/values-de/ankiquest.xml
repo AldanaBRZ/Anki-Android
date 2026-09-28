@@ -4,7 +4,7 @@
     <string name="ankiquest_community_reminders_title">Gemeinschaftserinnerungen</string>
     <string name="ankiquest_community_reminders_summary">Wähle Erinnerungen für Community-Events</string>
     <string name="ankiquest_streak_protection_title">Schutz der Lernserie</string>
-    <string name="ankiquest_streak_protection_summary">Standardmäßig aus. Nach der Aktivierung verdienst du mit allen drei täglichen Aufgaben einen Serienschutz pro Anki-Tag, bis zu 3. Für jeden Tag ohne Wiederholungen wird automatisch einer verwendet. Beim Ausschalten bleiben gesammelte Schutzmöglichkeiten erhalten.</string>
+    <string name="ankiquest_streak_protection_summary">Standardmäßig an. Wenn der Schutz aktiviert ist, erhältst du für alle drei täglichen Aufgaben einen Serienschutz pro Anki-Tag, bis zu 3. Für jeden Tag ohne Wiederholungen wird automatisch einer verwendet. Beim Ausschalten pausieren Sammeln und Einsatz; gesammelte Schutzmöglichkeiten bleiben erhalten.</string>
     <string name="ankiquest_avatar_title">Profilbild</string>
     <string name="ankiquest_avatar_summary">Wähle ein Bild für dein Profil, die Rangliste und die Widgets.</string>
     <string name="ankiquest_avatar_choose">Bild auswählen</string>
@@ -19,6 +19,8 @@
     <string name="ankiquest_reply">Antwort</string>
     <string name="ankiquest_nudges_title">Anstupser</string>
     <string name="ankiquest_nudges_summary">Benachrichtige mich, wenn ein Platz, mein bester Tag oder die nächste Stufe in Reichweite ist</string>
+    <string name="ankiquest_celebrations_title">Erfolge feiern</string>
+    <string name="ankiquest_celebrations_summary">Gratuliere mir zu Erfolgen, Meilensteinen der Lernserie und persönlichen Bestleistungen</string>
     <string name="ankiquest_nudges_unavailable">Richte zuerst Server, Spieler und Token ein</string>
     <string name="ankiquest_message_alerts_title">Nachrichten- und Lernbenachrichtigungen</string>
     <string name="ankiquest_nudge_alerts_title">Anstupser-Benachrichtigungen</string>
