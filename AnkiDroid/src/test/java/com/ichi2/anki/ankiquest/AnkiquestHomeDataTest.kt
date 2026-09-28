@@ -49,6 +49,8 @@ class AnkiquestHomeDataTest : RobolectricTest() {
 
     @Volatile private var changeAccountDuringRequest = false
 
+    @Volatile private var filteredActivityStatus = 200
+
     @Before
     fun prepare() {
         server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -60,6 +62,7 @@ class AnkiquestHomeDataTest : RobolectricTest() {
             bodies += exchange.requestBody.bufferedReader().use { it.readText() }
             var status = allStatus
             if (status == 200 && path.startsWith("/api/activity")) status = activityStatus
+            if (status == 200 && path.contains("category=")) status = filteredActivityStatus
             if (status == 200 && path.startsWith("/api/community/challenges")) status = challengeStatus
             val response =
                 when {
@@ -69,7 +72,10 @@ class AnkiquestHomeDataTest : RobolectricTest() {
                     path.endsWith("/read") -> ""
                     path.startsWith("/api/activity") ->
                         """{"items":[{"id":7,"title":"Goal invitation","body":"Join me","sender":"friend",
-                            |"challenge_id":42,"read_at":null}],"unread_count":1,"next_before":7}
+                            |"kind":"challenge_invite","action_required":true,"challenge_id":42,"read_at":null}],
+                            |"attention":[{"id":7,"title":"Goal invitation","body":"Join me","sender":"friend",
+                            |"kind":"challenge_invite","action_required":true,"challenge_id":42,"read_at":null}],
+                            |"unread_count":1,"action_count":1,"latest_id":7,"next_before":7}
                         """.trimMargin()
                     else -> "{}"
                 }
@@ -122,6 +128,32 @@ class AnkiquestHomeDataTest : RobolectricTest() {
             assertNull(inbox.unreadCount)
             assertEquals(7L, inbox.items.single().id)
             assertTrue(requests.any { it.first.startsWith("/api/notifications/") })
+        }
+
+    @Test
+    fun `activity filters and action metadata survive loading and pagination`() =
+        runBlocking {
+            val inbox = repository.load(account, HomeActivityCategory.CHALLENGES, true).inbox.value!!
+            assertTrue(inbox.filtersSupported)
+            assertEquals(HomeActivityCategory.CHALLENGES, inbox.category)
+            assertTrue(inbox.unreadOnly)
+            assertEquals(1, inbox.actionCount)
+            assertEquals(7L, inbox.latestId)
+            assertTrue(inbox.items.single().actionRequired)
+            assertEquals("challenge_invite", inbox.attention.single().kind)
+            assertTrue(requests.any { it.first.endsWith("&category=challenges&unread_only=true") && it.second == "Bearer secret" })
+            repository.olderActivity(account, 7, HomeActivityCategory.CHALLENGES, true)
+            assertTrue(requests.last().first.endsWith("&before=7&category=challenges&unread_only=true"))
+        }
+
+    @Test
+    fun `older servers reject filters and fall back to the full inbox`() =
+        runBlocking {
+            filteredActivityStatus = 400
+            val inbox = repository.load(account, HomeActivityCategory.MESSAGES).inbox.value!!
+            assertEquals(HomeActivityCategory.ALL, inbox.category)
+            assertTrue(requests.any { it.first.contains("category=messages") })
+            assertTrue(requests.any { it.first.endsWith("days=90&limit=100") })
         }
 
     @Test

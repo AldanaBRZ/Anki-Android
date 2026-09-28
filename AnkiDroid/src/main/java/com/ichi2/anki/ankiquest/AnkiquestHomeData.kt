@@ -156,6 +156,8 @@ internal data class HomeNotice(
     val createdAt: Long,
     val challengeId: Long?,
     val unread: Boolean,
+    val kind: String = "message",
+    val actionRequired: Boolean = false,
 ) {
     companion object {
         fun parse(json: JSONObject): HomeNotice =
@@ -168,8 +170,21 @@ internal data class HomeNotice(
                 json.optLong("created_at"),
                 json.optLong("challenge_id").takeIf { it > 0 },
                 json.has("read_at") && json.isNull("read_at"),
+                json.optString("kind", "message"),
+                json.optBoolean("action_required"),
             )
     }
+}
+
+internal enum class HomeActivityCategory(
+    val query: String?,
+) {
+    ALL(null),
+    NEEDS_ACTION("needs_action"),
+    MESSAGES("messages"),
+    CHALLENGES("challenges"),
+    DECK_COMPLETIONS("deck_completions"),
+    STUDY_UPDATES("study_updates"),
 }
 
 internal data class HomeInbox(
@@ -177,14 +192,34 @@ internal data class HomeInbox(
     val unreadCount: Int?,
     val nextBefore: Long?,
     val modern: Boolean,
+    val attention: List<HomeNotice> = emptyList(),
+    val actionCount: Int = 0,
+    val latestId: Long? = null,
+    val filtersSupported: Boolean = false,
+    val category: HomeActivityCategory = HomeActivityCategory.ALL,
+    val unreadOnly: Boolean = false,
 ) {
     companion object {
-        fun parse(json: JSONObject): HomeInbox =
+        fun parse(
+            json: JSONObject,
+            category: HomeActivityCategory = HomeActivityCategory.ALL,
+            unreadOnly: Boolean = false,
+        ): HomeInbox =
             HomeInbox(
                 json.getJSONArray("items").objects().map(HomeNotice::parse),
                 json.optInt("unread_count"),
                 json.optLong("next_before").takeIf { it > 0 },
                 true,
+                json
+                    .optJSONArray("attention")
+                    ?.objects()
+                    ?.map(HomeNotice::parse)
+                    .orEmpty(),
+                json.optInt("action_count"),
+                json.optLong("latest_id").takeIf { it > 0 },
+                json.has("latest_id"),
+                category,
+                unreadOnly,
             )
 
         fun legacy(json: JSONArray): HomeInbox = HomeInbox(json.objects().map(HomeNotice::parse), null, null, false)
@@ -314,7 +349,11 @@ internal class HomeRepository(
             }
         }
 
-    suspend fun load(account: HomeAccount): HomeRemote =
+    suspend fun load(
+        account: HomeAccount,
+        category: HomeActivityCategory = HomeActivityCategory.ALL,
+        unreadOnly: Boolean = false,
+    ): HomeRemote =
         coroutineScope {
             ensureCurrent(account)
             val old = cache.select(account)
@@ -331,7 +370,12 @@ internal class HomeRepository(
                 }
             val inbox =
                 async<HomeSection<HomeInbox>> {
-                    if (account.token.isEmpty()) HomeSection(failure = HomeFailure.AUTH) else section(old?.inbox) { inbox(account) }
+                    if (account.token.isEmpty()) {
+                        HomeSection(failure = HomeFailure.AUTH)
+                    } else {
+                        val sameFilter = old?.inbox?.value?.takeIf { it.category == category && it.unreadOnly == unreadOnly }
+                        section(old?.inbox?.takeIf { sameFilter != null }) { inbox(account, category = category, unreadOnly = unreadOnly) }
+                    }
                 }
             val result = HomeRemote(account.scope, profile.await(), challenges.await(), inbox.await(), TimeManager.time.intTimeMS())
             ensureCurrent(account)
@@ -354,11 +398,23 @@ internal class HomeRepository(
     private fun inbox(
         account: HomeAccount,
         before: Long? = null,
+        category: HomeActivityCategory = HomeActivityCategory.ALL,
+        unreadOnly: Boolean = false,
     ): HomeInbox {
         try {
-            val suffix = if (before == null) "" else "&before=$before"
-            return HomeInbox.parse(JSONObject(request(account, "api/activity/${account.encodedUser}?days=90&limit=100$suffix")))
+            val suffix =
+                buildString {
+                    if (before != null) append("&before=$before")
+                    if (category.query != null) append("&category=${category.query}")
+                    if (unreadOnly) append("&unread_only=true")
+                }
+            return HomeInbox.parse(
+                JSONObject(request(account, "api/activity/${account.encodedUser}?days=90&limit=100$suffix")),
+                category,
+                unreadOnly,
+            )
         } catch (e: HomeHttpException) {
+            if (e.code == 400 && (category != HomeActivityCategory.ALL || unreadOnly)) return inbox(account, before)
             if (e.code != 404 || before != null) throw e
             return HomeInbox.legacy(JSONArray(request(account, "api/notifications/${account.encodedUser}")))
         }
@@ -367,7 +423,9 @@ internal class HomeRepository(
     suspend fun olderActivity(
         account: HomeAccount,
         before: Long,
-    ): HomeInbox = withContext(Dispatchers.IO) { inbox(account, before) }
+        category: HomeActivityCategory = HomeActivityCategory.ALL,
+        unreadOnly: Boolean = false,
+    ): HomeInbox = withContext(Dispatchers.IO) { inbox(account, before, category, unreadOnly) }
 
     suspend fun challengeAction(
         account: HomeAccount,

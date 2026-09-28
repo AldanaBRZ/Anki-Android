@@ -12,6 +12,7 @@ import android.text.InputFilter
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -27,6 +28,7 @@ import androidx.core.widget.TextViewCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.ichi2.anki.AnkiActivity
 import com.ichi2.anki.CollectionManager
@@ -43,6 +45,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.text.DateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.UUID
 
@@ -54,6 +57,9 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
     private var tab = "today"
     private var challengeId: Long? = null
     private var notificationId: Long? = null
+    private var openedNotice: HomeNotice? = null
+    private var activityCategory = HomeActivityCategory.ALL
+    private var activityUnreadOnly = false
     private var account: HomeAccount? = null
     private var local: HomeLocal? = null
     private var localFailed = false
@@ -72,6 +78,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                     challengeId != null || notificationId != null -> {
                         challengeId = null
                         notificationId = null
+                        openedNotice = null
                     }
                     tab == "activity" -> tab = "friends"
                     else -> tab = "today"
@@ -144,6 +151,9 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
     }
 
     private fun readRoute(intent: Intent) {
+        activityCategory = HomeActivityCategory.ALL
+        activityUnreadOnly = false
+        openedNotice = null
         tab = validTab(intent.getStringExtra(EXTRA_TAB))
         challengeId = intent.getLongExtra(EXTRA_CHALLENGE_ID, 0).takeIf { it > 0 }
         notificationId = intent.getLongExtra(EXTRA_NOTIFICATION_ID, 0).takeIf { it > 0 }
@@ -151,6 +161,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         if (expected != null && expected != AnkiquestHomeData.account()?.notificationAccount) {
             challengeId = null
             notificationId = null
+            openedNotice = null
             tab = "activity"
             message = getString(R.string.aq_home_account_route_changed)
         }
@@ -163,6 +174,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             remote = null
             challengeId = null
             notificationId = null
+            openedNotice = null
             message = null
             readInFlight.clear()
         }
@@ -186,7 +198,11 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             }
         }
         networkJob?.cancel()
-        remote = repository.cached(current)
+        val cached = repository.cached(current)
+        remote =
+            cached?.takeIf {
+                it.inbox.value?.let { inbox -> inbox.category == activityCategory && inbox.unreadOnly == activityUnreadOnly } == true
+            } ?: cached?.copy(inbox = HomeSection())
         if (current == null) {
             loading = false
             render()
@@ -197,9 +213,18 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         networkJob =
             lifecycleScope.launch {
                 try {
-                    val result = repository.load(current)
+                    val result = repository.load(current, activityCategory, activityUnreadOnly)
                     if (turn == generation && AnkiquestHomeData.account()?.scope == current.scope) {
                         remote = result
+                        if (result.inbox.value?.let {
+                                !it.filtersSupported || it.category != activityCategory ||
+                                    it.unreadOnly != activityUnreadOnly
+                            } ==
+                            true
+                        ) {
+                            activityCategory = HomeActivityCategory.ALL
+                            activityUnreadOnly = false
+                        }
                         resolveNotificationRoute(current)
                     }
                 } catch (_: HomeAccountChanged) {
@@ -479,8 +504,29 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         sectionWarning(remote?.inbox)
         val inbox = remote?.inbox?.value
         if (inbox != null) {
+            if (inbox.filtersSupported) {
+                renderActivityFilters()
+                if (inbox.actionCount > 0 && activityCategory != HomeActivityCategory.NEEDS_ACTION) {
+                    val attention = card(tinted = true)
+                    text(attention, getString(R.string.aq_home_needs_action_count, inbox.actionCount), heading = true)
+                    text(attention, getString(R.string.aq_home_needs_action_hint), small = true)
+                    if (activityCategory == HomeActivityCategory.ALL) {
+                        inbox.attention.forEach { notice ->
+                            text(attention, notice.title, heading = true)
+                            text(attention, notice.body)
+                            button(attention, R.string.aq_home_view_invitation) { openNotice(notice) }
+                        }
+                    }
+                    if (inbox.actionCount > inbox.attention.size || activityCategory != HomeActivityCategory.ALL) {
+                        button(
+                            attention,
+                            R.string.aq_home_view_all_invitations,
+                        ) { selectActivityCategory(HomeActivityCategory.NEEDS_ACTION) }
+                    }
+                }
+            }
             text(content, getString(if (inbox.modern) R.string.aq_home_inbox_retention else R.string.aq_home_inbox_legacy), small = true)
-            val through = inbox.items.maxOfOrNull { it.id }
+            val through = inbox.latestId ?: inbox.items.maxOfOrNull { it.id }
             if (inbox.modern && (inbox.unreadCount ?: 0) > 0 && through != null) {
                 button(content, R.string.aq_home_mark_all_read, enabled = remote?.inbox?.live == true && !saving && !loading) {
                     mutate { captured ->
@@ -492,17 +538,40 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                                     inbox =
                                         HomeSection(
                                             current.copy(
-                                                items = current.items.map { it.copy(unread = it.unread && it.id > through) },
+                                                items =
+                                                    current.items
+                                                        .map { it.copy(unread = it.unread && it.id > through) }
+                                                        .filter { !activityUnreadOnly || it.unread },
+                                                attention = current.attention.map { it.copy(unread = it.unread && it.id > through) },
                                                 unreadCount = current.items.count { it.unread && it.id > through },
                                             ),
                                         ),
                                 )
+                            refresh()
                         }
                     }
                 }
             }
-            if (inbox.items.isEmpty()) text(content, getString(R.string.aq_home_inbox_empty))
-            inbox.items.forEach { notice ->
+            val pinned = if (activityCategory == HomeActivityCategory.ALL) inbox.attention.map { it.id }.toSet() else emptySet()
+            val visible = inbox.items.filter { it.id !in pinned }
+            if (visible.isEmpty()) {
+                val empty =
+                    when {
+                        activityUnreadOnly -> R.string.aq_home_no_unread
+                        activityCategory == HomeActivityCategory.NEEDS_ACTION -> R.string.aq_home_no_action
+                        activityCategory != HomeActivityCategory.ALL -> R.string.aq_home_no_category
+                        pinned.isNotEmpty() -> R.string.aq_home_everything_else_read
+                        else -> R.string.aq_home_inbox_empty
+                    }
+                text(content, getString(empty))
+            }
+            var previousDay = ""
+            visible.forEach { notice ->
+                val day = activityDay(notice.createdAt)
+                if (day != previousDay) {
+                    text(content, day, heading = true)
+                    previousDay = day
+                }
                 val row = card()
                 if (notice.unread && inbox.modern) text(row, getString(R.string.aq_home_unread), small = true)
                 text(row, notice.title, heading = true)
@@ -522,7 +591,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             inbox.nextBefore?.let { before ->
                 button(content, R.string.aq_home_older, enabled = remote?.inbox?.live == true && !saving) {
                     mutate { captured ->
-                        val next = repository.olderActivity(captured, before)
+                        val next = repository.olderActivity(captured, before, activityCategory, activityUnreadOnly)
                         remote = remote?.copy(inbox = HomeSection(next.copy(items = (inbox.items + next.items).distinctBy { it.id })))
                     }
                 }
@@ -531,13 +600,76 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
         refreshButton()
     }
 
+    private fun selectActivityCategory(category: HomeActivityCategory) {
+        if (activityCategory == category || loading || saving) return
+        activityCategory = category
+        refresh()
+    }
+
+    private fun renderActivityFilters() {
+        val labels =
+            listOf(
+                HomeActivityCategory.ALL to R.string.aq_home_filter_all,
+                HomeActivityCategory.NEEDS_ACTION to R.string.aq_home_needs_action,
+                HomeActivityCategory.MESSAGES to R.string.aq_home_filter_messages,
+                HomeActivityCategory.CHALLENGES to R.string.aq_home_filter_challenges,
+                HomeActivityCategory.DECK_COMPLETIONS to R.string.aq_home_filter_decks,
+                HomeActivityCategory.STUDY_UPDATES to R.string.aq_home_filter_study,
+            )
+        val strip = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        var selected: Chip? = null
+        labels.forEach { (category, label) ->
+            val chip =
+                Chip(this).apply {
+                    text = getString(label)
+                    isCheckable = true
+                    isChecked = category == activityCategory
+                    isEnabled = !loading && !saving
+                    setOnClickListener { selectActivityCategory(category) }
+                }
+            if (category == activityCategory) selected = chip
+            chips.addView(chip)
+        }
+        strip.addView(chips)
+        content.addView(strip)
+        selected?.let { chosen -> strip.post { strip.scrollTo((chosen.left - dp(12)).coerceAtLeast(0), 0) } }
+        content.addView(
+            Chip(this).apply {
+                text = getString(R.string.aq_home_unread_only)
+                isCheckable = true
+                isChecked = activityUnreadOnly
+                isEnabled = !loading && !saving
+                setOnClickListener {
+                    activityUnreadOnly = !activityUnreadOnly
+                    refresh()
+                }
+            },
+        )
+    }
+
+    private fun activityDay(createdAt: Long): String {
+        val then = Calendar.getInstance().apply { timeInMillis = createdAt * 1000 }
+        val today = Calendar.getInstance()
+        if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR) && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {
+            return getString(R.string.aq_home_filter_today)
+        }
+        today.add(Calendar.DAY_OF_YEAR, -1)
+        if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR) && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {
+            return getString(R.string.aq_home_filter_yesterday)
+        }
+        return DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(createdAt * 1000))
+    }
+
     private fun openNotice(notice: HomeNotice) {
         if (notice.challengeId != null) {
             tab = "friends"
             challengeId = notice.challengeId
             notificationId = null
+            openedNotice = null
         } else {
             notificationId = notice.id
+            openedNotice = notice
         }
         render(resetScroll = true)
         markRead(notice)
@@ -551,22 +683,29 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                 repository.markRead(captured, notice.id)
                 if (captured.scope != AnkiquestHomeData.account()?.scope) return@launch
                 val inbox = remote?.inbox?.value ?: return@launch
-                if (inbox.items.none { it.id == notice.id && it.unread }) return@launch
+                if (inbox.items.none { it.id == notice.id && it.unread } &&
+                    inbox.attention.none { it.id == notice.id && it.unread }
+                ) {
+                    return@launch
+                }
+                if (openedNotice?.id == notice.id) openedNotice = openedNotice?.copy(unread = false)
                 remote =
                     remote?.copy(
                         inbox =
                             HomeSection(
                                 inbox.copy(
                                     items =
-                                        inbox.items.map {
-                                            if (it.id ==
-                                                notice.id
-                                            ) {
-                                                it.copy(unread = false)
-                                            } else {
-                                                it
-                                            }
-                                        },
+                                        inbox.items
+                                            .map {
+                                                if (it.id ==
+                                                    notice.id
+                                                ) {
+                                                    it.copy(unread = false)
+                                                } else {
+                                                    it
+                                                }
+                                            }.filter { !activityUnreadOnly || it.unread },
+                                    attention = inbox.attention.map { if (it.id == notice.id) it.copy(unread = false) else it },
                                     unreadCount = inbox.unreadCount?.minus(1)?.coerceAtLeast(0),
                                 ),
                             ),
@@ -609,6 +748,7 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
             }
         }
         if (captured.scope != AnkiquestHomeData.account()?.scope || notice == null) return
+        if (notice.challengeId == null) openedNotice = notice
         notice.challengeId?.let {
             challengeId = it
             tab = "friends"
@@ -619,11 +759,12 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
     private fun renderMessage() {
         backButton()
         val notice =
-            remote
-                ?.inbox
-                ?.value
-                ?.items
-                ?.firstOrNull { it.id == notificationId }
+            openedNotice?.takeIf { it.id == notificationId }
+                ?: remote
+                    ?.inbox
+                    ?.value
+                    ?.items
+                    ?.firstOrNull { it.id == notificationId }
         if (notice == null) {
             text(content, getString(if (loading) R.string.aq_home_loading_remote else R.string.aq_home_notification_missing))
             button(content, R.string.aq_home_activity) { showTab("activity") }
@@ -670,7 +811,8 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
                     mutate(expectedScope) { captured ->
                         repository.reply(captured, notice.id, value)
                         message = getString(R.string.aq_home_reply_sent)
-                        remote = repository.load(captured)
+                        openedNotice = openedNotice?.takeIf { it.id == notice.id }?.copy(replied = true)
+                        remote = repository.load(captured, activityCategory, activityUnreadOnly)
                     }
                 }
             }
