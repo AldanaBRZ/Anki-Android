@@ -38,7 +38,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.util.Date
 
-class AnkiquestSettingsFragment : SettingsFragment() {
+open class AnkiquestSettingsFragment : SettingsFragment() {
     override val preferenceResource = R.xml.preferences_ankiquest
     override val analyticsScreenNameConstant = "prefs.ankiquest"
 
@@ -75,37 +75,14 @@ class AnkiquestSettingsFragment : SettingsFragment() {
 
     override fun initSubscreen() {
         refreshServerSettings.clear()
+        bindDashboard(R.string.ankiquest_dashboard_key)
+    }
+
+    protected fun bindAccount() {
         requirePreference<VersatileTextPreference>(R.string.ankiquest_url_key).continuousValidator =
             VersatileTextPreference.Validator { value ->
                 if (value.isNotEmpty()) value.toHttpUrl()
             }
-        requirePreference<SwitchPreferenceCompat>(R.string.ankiquest_notify_rank_key).setOnPreferenceChangeListener { _, enabled ->
-            if (enabled == true) askForNotifications()
-            true
-        }
-        requirePreference<ListPreference>(R.string.ankiquest_streak_hours_key).setOnPreferenceChangeListener { _, hours ->
-            if (hours != "0") askForNotifications()
-            true
-        }
-        bindServerToggle(
-            R.string.ankiquest_nudges_key,
-            read = { Ankiquest.nudgesEnabled() },
-            save = { Ankiquest.setNudges(it).getBoolean("nudges") },
-            notify = true,
-        )
-        bindServerToggle(
-            R.string.ankiquest_celebrations_key,
-            read = { Ankiquest.celebrationsEnabled() },
-            save = { Ankiquest.setCelebrations(it).optBoolean("celebrations", it) },
-            notify = true,
-        )
-        bindServerToggle(
-            R.string.ankiquest_streak_protection_key,
-            read = { Ankiquest.streakProtectionEnabled() },
-            save = { Ankiquest.setStreakProtection(it) },
-        )
-        bindDashboard(R.string.ankiquest_dashboard_key)
-        bindDashboard(R.string.ankiquest_community_reminders_key, community = true)
         requirePreference<Preference>(R.string.ankiquest_avatar_key).setOnPreferenceClickListener {
             pictureAction {
                 val account = checkNotNull(AnkiquestAvatars.account()) { getString(R.string.ankiquest_nudges_unavailable) }
@@ -142,14 +119,48 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             }
             true
         }
+        bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
+    }
+
+    protected fun bindStudy() {
+        bindServerToggle(
+            R.string.ankiquest_streak_protection_key,
+            read = { Ankiquest.streakProtectionEnabled() },
+            save = { Ankiquest.setStreakProtection(it) },
+        )
+    }
+
+    protected fun bindNotifications() {
+        requirePreference<SwitchPreferenceCompat>(R.string.ankiquest_notify_rank_key).setOnPreferenceChangeListener { _, enabled ->
+            if (enabled == true) askForNotifications()
+            true
+        }
+        requirePreference<ListPreference>(R.string.ankiquest_streak_hours_key).setOnPreferenceChangeListener { _, hours ->
+            if (hours != "0") askForNotifications()
+            true
+        }
+        bindServerToggle(
+            R.string.ankiquest_nudges_key,
+            read = { Ankiquest.nudgesEnabled() },
+            save = { Ankiquest.setNudges(it).getBoolean("nudges") },
+            notify = true,
+        )
+        bindServerToggle(
+            R.string.ankiquest_celebrations_key,
+            read = { Ankiquest.celebrationsEnabled() },
+            save = { Ankiquest.setCelebrations(it).optBoolean("celebrations", it) },
+            notify = true,
+        )
+        bindDashboard(R.string.ankiquest_community_reminders_key, community = true)
         bindAlertSettings(R.string.ankiquest_message_alerts_key, nudge = false)
         bindAlertSettings(R.string.ankiquest_nudge_alerts_key, nudge = true)
         requirePreference<Preference>(R.string.ankiquest_health_key).setOnPreferenceClickListener {
             showNotificationHealth()
             true
         }
-        bindAction(R.string.ankiquest_test_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = false) }
-        bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
+    }
+
+    protected fun bindSharing() {
         bindAction(R.string.ankiquest_deck_notifications_key) {
             try {
                 showDeckNotifications(Ankiquest.deckNotificationSettings())
@@ -158,6 +169,10 @@ class AnkiquestSettingsFragment : SettingsFragment() {
                 getString(R.string.ankiquest_check_failed, e.message ?: e.javaClass.simpleName)
             }
         }
+    }
+
+    protected fun bindMaintenance() {
+        bindAction(R.string.ankiquest_upload_all_key) { Ankiquest.runFromSettings(requireContext(), uploadAll = true) }
         requirePreference<Preference>(R.string.ankiquest_check_updates_key).summary =
             getString(
                 R.string.ankiquest_check_updates_summary,

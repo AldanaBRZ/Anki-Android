@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
+    <string name="ankiquest_account_title">Cuenta y conexión</string>
+    <string name="ankiquest_account_summary">Servidor, jugador, token y foto de perfil</string>
+    <string name="ankiquest_study_title">Estudio y rachas</string>
+    <string name="ankiquest_study_summary">Opciones de estudio diario y protección de racha</string>
+    <string name="ankiquest_notifications_title">Notificaciones</string>
+    <string name="ankiquest_notifications_summary">Recordatorios, avisos y alertas</string>
+    <string name="ankiquest_sharing_title">Amigos y contenido compartido</string>
+    <string name="ankiquest_sharing_summary">Avisos de mazos y suscripciones</string>
+    <string name="ankiquest_maintenance_title">Aplicación y datos</string>
+    <string name="ankiquest_maintenance_summary">Subida de repasos y actualizaciones</string>
+    <string name="ankiquest_notification_events_title">Cuándo avisar</string>
+    <string name="ankiquest_notification_delivery_title">Ajustes de alertas</string>
     <string name="ankiquest_dashboard_title">Clasificación</string>
     <string name="ankiquest_community_reminders_title">Recordatorios de la comunidad</string>
     <string name="ankiquest_community_reminders_summary">Elige recordatorios de eventos de la comunidad</string>

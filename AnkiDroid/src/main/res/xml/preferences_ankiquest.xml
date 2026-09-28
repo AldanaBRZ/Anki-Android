@@ -10,107 +10,34 @@
         android:title="@string/ankiquest_dashboard_title"
         android:icon="@drawable/aki_face"
         android:summary="@string/aki_settings_summary" />
-    <com.ichi2.preferences.VersatileTextPreference
-        android:key="@string/ankiquest_url_key"
-        android:title="@string/ankiquest_url_title"
-        android:inputType="textUri"
-        app:dialogHint="@string/dialog_hint_url"
-        app:useSimpleSummaryProvider="true" />
-    <com.ichi2.preferences.VersatileTextPreference
-        android:key="@string/ankiquest_user_key"
-        android:title="@string/ankiquest_user_title"
-        android:inputType="text"
-        app:useSimpleSummaryProvider="true" />
-    <com.ichi2.preferences.VersatileTextPreference
-        android:key="@string/ankiquest_token_key"
-        android:title="@string/ankiquest_token_title"
-        android:inputType="textPassword" />
     <Preference
-        android:key="@string/ankiquest_avatar_key"
+        android:key="@string/ankiquest_account_screen_key"
+        android:fragment="com.ichi2.anki.preferences.AnkiquestAccountSettingsFragment"
         android:persistent="false"
-        android:title="@string/ankiquest_avatar_title"
-        android:summary="@string/ankiquest_avatar_summary" />
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="@string/ankiquest_open_today_key"
-        android:summary="@string/ankiquest_open_today_summary"
-        android:title="@string/ankiquest_open_today_title" />
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
-        android:key="@string/ankiquest_summary_preference_key"
-        android:summary="@string/ankiquest_summary_preference_summary"
-        android:title="@string/ankiquest_summary_preference_title" />
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
-        android:key="@string/ankiquest_notify_rank_key"
-        android:summary="@string/ankiquest_notify_rank_summary"
-        android:title="@string/ankiquest_notify_rank_title" />
-    <ListPreference
-        android:defaultValue="2"
-        android:entries="@array/ankiquest_streak_hours_entries"
-        android:entryValues="@array/ankiquest_streak_hours_values"
-        android:key="@string/ankiquest_streak_hours_key"
-        android:title="@string/ankiquest_streak_hours_title"
-        app:useSimpleSummaryProvider="true" />
-    <SwitchPreferenceCompat
-        android:key="@string/ankiquest_nudges_key"
-        android:summary="@string/ankiquest_nudges_summary"
-        android:title="@string/ankiquest_nudges_title" />
-    <SwitchPreferenceCompat
-        android:key="@string/ankiquest_celebrations_key"
-        android:summary="@string/ankiquest_celebrations_summary"
-        android:title="@string/ankiquest_celebrations_title" />
-    <SwitchPreferenceCompat
-        android:key="@string/ankiquest_streak_protection_key"
+        android:title="@string/ankiquest_account_title"
+        android:summary="@string/ankiquest_account_summary" />
+    <Preference
+        android:key="@string/ankiquest_study_screen_key"
+        android:fragment="com.ichi2.anki.preferences.AnkiquestStudySettingsFragment"
         android:persistent="false"
-        android:summary="@string/ankiquest_streak_protection_summary"
-        android:title="@string/ankiquest_streak_protection_title" />
+        android:title="@string/ankiquest_study_title"
+        android:summary="@string/ankiquest_study_summary" />
     <Preference
-        android:key="@string/ankiquest_community_reminders_key"
+        android:key="@string/ankiquest_notifications_screen_key"
+        android:fragment="com.ichi2.anki.preferences.AnkiquestNotificationsSettingsFragment"
         android:persistent="false"
-        android:summary="@string/ankiquest_community_reminders_summary"
-        android:title="@string/ankiquest_community_reminders_title" />
+        android:title="@string/ankiquest_notifications_title"
+        android:summary="@string/ankiquest_notifications_summary" />
     <Preference
-        android:key="@string/ankiquest_message_alerts_key"
+        android:key="@string/ankiquest_sharing_screen_key"
+        android:fragment="com.ichi2.anki.preferences.AnkiquestSharingSettingsFragment"
         android:persistent="false"
-        android:title="@string/ankiquest_message_alerts_title"
-        android:summary="@string/ankiquest_alerts_summary" />
+        android:title="@string/ankiquest_sharing_title"
+        android:summary="@string/ankiquest_sharing_summary" />
     <Preference
-        android:key="@string/ankiquest_nudge_alerts_key"
+        android:key="@string/ankiquest_maintenance_screen_key"
+        android:fragment="com.ichi2.anki.preferences.AnkiquestMaintenanceSettingsFragment"
         android:persistent="false"
-        android:title="@string/ankiquest_nudge_alerts_title"
-        android:summary="@string/ankiquest_alerts_summary" />
-    <Preference
-        android:key="@string/ankiquest_health_key"
-        android:persistent="false"
-        android:title="@string/ankiquest_health_title"
-        android:summary="@string/ankiquest_health_summary" />
-    <Preference
-        android:key="@string/ankiquest_deck_notifications_key"
-        android:title="@string/ankiquest_deck_notifications_title"
-        android:summary="@string/ankiquest_deck_notifications_summary" />
-    <Preference
-        android:key="@string/ankiquest_subscriptions_key"
-        android:fragment="com.ichi2.anki.preferences.AnkiquestSubscriptionsFragment"
-        android:persistent="false"
-        android:title="@string/ankiquest_subscriptions_title"
-        android:summary="@string/ankiquest_subscriptions_summary" />
-    <Preference
-        android:key="@string/ankiquest_test_key"
-        android:title="@string/ankiquest_test_title"
-        android:summary="@string/ankiquest_test_summary" />
-    <Preference
-        android:key="@string/ankiquest_upload_all_key"
-        android:title="@string/ankiquest_upload_all_title"
-        android:summary="@string/ankiquest_upload_all_summary" />
-    <ListPreference
-        android:defaultValue="stable"
-        android:entries="@array/ankiquest_update_channel_entries"
-        android:entryValues="@array/ankiquest_update_channel_values"
-        android:key="@string/ankiquest_update_channel_key"
-        android:title="@string/ankiquest_update_channel_title"
-        app:useSimpleSummaryProvider="true" />
-    <Preference
-        android:key="@string/ankiquest_check_updates_key"
-        android:title="@string/ankiquest_check_updates_title" />
+        android:title="@string/ankiquest_maintenance_title"
+        android:summary="@string/ankiquest_maintenance_summary" />
 </PreferenceScreen>

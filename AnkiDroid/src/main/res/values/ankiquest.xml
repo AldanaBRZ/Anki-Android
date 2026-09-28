@@ -1,6 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="ankiquest_account_screen_key" translatable="false">ankiquestAccountScreen</string>
+    <string name="ankiquest_account_title">Account &amp; connection</string>
+    <string name="ankiquest_account_summary">Server, player, token and profile picture</string>
+    <string name="ankiquest_study_screen_key" translatable="false">ankiquestStudyScreen</string>
+    <string name="ankiquest_study_title">Study &amp; streaks</string>
+    <string name="ankiquest_study_summary">Daily study options and streak protection</string>
+    <string name="ankiquest_notifications_screen_key" translatable="false">ankiquestNotificationsScreen</string>
+    <string name="ankiquest_notifications_title">Notifications</string>
+    <string name="ankiquest_notifications_summary">Reminders, nudges and alert delivery</string>
+    <string name="ankiquest_sharing_screen_key" translatable="false">ankiquestSharingScreen</string>
+    <string name="ankiquest_sharing_title">Friends &amp; sharing</string>
+    <string name="ankiquest_sharing_summary">Deck updates and subscriptions</string>
+    <string name="ankiquest_maintenance_screen_key" translatable="false">ankiquestMaintenanceScreen</string>
+    <string name="ankiquest_maintenance_title">App &amp; data</string>
+    <string name="ankiquest_maintenance_summary">Review uploads and app updates</string>
+    <string name="ankiquest_notification_events_title">When to notify</string>
+    <string name="ankiquest_notification_delivery_title">Alert settings</string>
     <string name="ankiquest_dashboard_key" translatable="false">ankiquestDashboard</string>
     <string name="ankiquest_dashboard_title" maxLength="41">Leaderboard</string>
     <string name="ankiquest_community_reminders_key" translatable="false">ankiquestCommunityReminders</string>
