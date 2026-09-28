@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_home_activity">Actividade</string>
+    <string name="aq_home_settings">Conta e preferências</string>
+    <string name="aq_home_today_subtitle">O teu próximo passo útil, ao teu ritmo.</string>
+    <string name="aq_home_loading_local">A abrir os teus baralhos…</string>
+    <string name="aq_home_loading_remote">A atualizar o progresso partilhado…</string>
+    <string name="aq_home_next_step">O teu próximo passo</string>
+    <string name="aq_home_study_due">Estudar %1$d cartões para revisão</string>
+    <string name="aq_home_counts">%1$d revisões · %2$d em aprendizagem · %3$d novos</string>
+    <string name="aq_home_change_deck">Mudar de baralho</string>
+    <string name="aq_home_open_decks">Abrir baralhos</string>
+    <string name="aq_home_no_decks">O teu estudo começa com um baralho.</string>
+    <string name="aq_home_local_unavailable">A tua coleção não está pronta. Verifica-a em Baralhos; podes estudar sem o AnkiQuest.</string>
+    <string name="aq_home_streak_level">Sequência de %1$d dias · Nível %2$d</string>
+    <string name="aq_home_quests">Missões diárias</string>
+    <string name="aq_home_progress_fraction">%1$d /%2$d</string>
+    <string name="aq_home_quest_done">Concluída · %1$d XP</string>
+    <string name="aq_home_connected">Liga-te uma vez para partilhares objetivos e progresso. Os teus baralhos locais estão prontos.</string>
+    <string name="aq_home_connect">Ligar AnkiQuest</string>
+    <string name="aq_home_offline">Não foi possível ligar. O estudo local continua a funcionar.</string>
+    <string name="aq_home_auth">O teu acesso de membro precisa de atenção. Verifica o servidor, o jogador e o token nas preferências.</string>
+    <string name="aq_home_server_error">Não foi possível carregar o progresso partilhado. Tenta atualizar.</string>
+    <string name="aq_home_retry">Atualizar progresso partilhado</string>
+    <string name="aq_home_account_route_changed">Esta notificação pertence a outra conta. A mostrar a atividade desta conta.</string>
+    <string name="aq_home_last_session">A tua última sessão de estudo</string>
+    <string name="aq_home_session_summary">%1$d revisões · %2$s · %3$d cartões prontos no fim</string>
+</resources>

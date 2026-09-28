@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ankiquest_health_title">Estado das notificações</string>
+    <string name="ankiquest_health_summary">Verificar a entrega e enviar um alerta de teste</string>
+    <string name="ankiquest_health_permission">Permissão de notificações: %1$s</string>
+    <string name="ankiquest_health_messages">Alertas de mensagens: %1$s</string>
+    <string name="ankiquest_health_nudges">Alertas de lembrete: %1$s</string>
+    <string name="ankiquest_health_last_sync">Última sincronização da caixa de entrada: %1$s</string>
+    <string name="ankiquest_health_allowed">Autorizado</string>
+    <string name="ankiquest_health_blocked">Bloqueado nas configurações do Android</string>
+    <string name="ankiquest_health_never">Nunca para esta conta</string>
+    <string name="ankiquest_health_test">Enviar alerta de teste</string>
+    <string name="ankiquest_health_permission_settings">Abrir permissões de notificações</string>
+    <string name="ankiquest_health_test_title">Alerta de teste do AnkiQuest</string>
+    <string name="ankiquest_health_test_body">Se vires isto, os alertas locais estão a funcionar.</string>
+    <string name="ankiquest_health_test_posted">Alerta de teste enviado. O teu telefone controla os avisos no ecrã, o som e a vibração.</string>
+    <string name="ankiquest_health_test_blocked">O canal de mensagens está desativado. Abre as definições do Android para o ativares.</string>
+    <string name="ankiquest_health_test_disabled">As notificações do AnkiQuest não estão permitidas. Ativa-as nas definições do Android.</string>
+</resources>

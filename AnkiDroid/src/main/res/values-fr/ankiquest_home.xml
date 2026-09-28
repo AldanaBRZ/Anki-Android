@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="aq_home_activity">Activité</string>
+    <string name="aq_home_settings">Compte et préférences</string>
+    <string name="aq_home_today_subtitle">La prochaine étape utile, à ton rythme.</string>
+    <string name="aq_home_loading_local">Ouverture de tes paquets…</string>
+    <string name="aq_home_loading_remote">Mise à jour de la progression partagée…</string>
+    <string name="aq_home_next_step">Ta prochaine étape</string>
+    <string name="aq_home_study_due">Étudier %1$d cartes à réviser</string>
+    <string name="aq_home_counts">%1$d révisions · %2$d en apprentissage · %3$d nouvelles</string>
+    <string name="aq_home_change_deck">Changer de paquet</string>
+    <string name="aq_home_open_decks">Ouvrir les paquets</string>
+    <string name="aq_home_no_decks">Ton étude commence avec un paquet.</string>
+    <string name="aq_home_local_unavailable">Ta collection n’est pas prête. Vérifie-la dans Paquets ; tu peux étudier sans AnkiQuest.</string>
+    <string name="aq_home_streak_level">Série de %1$d jours · Niveau %2$d</string>
+    <string name="aq_home_quests">Missions quotidiennes</string>
+    <string name="aq_home_progress_fraction">%1$d / %2$d</string>
+    <string name="aq_home_quest_done">Terminé · %1$d XP</string>
+    <string name="aq_home_connected">Connecte-toi une fois pour partager tes objectifs et ta progression. Tes paquets locaux sont prêts.</string>
+    <string name="aq_home_connect">Connecter AnkiQuest</string>
+    <string name="aq_home_offline">Connexion impossible. L’étude locale fonctionne toujours.</string>
+    <string name="aq_home_auth">Ton accès de membre doit être vérifié. Contrôle le serveur, le joueur et le jeton dans les préférences.</string>
+    <string name="aq_home_server_error">La progression partagée n’a pas pu être chargée. Essaie d’actualiser.</string>
+    <string name="aq_home_retry">Actualiser la progression partagée</string>
+    <string name="aq_home_account_route_changed">Cette notification concerne un autre compte. Voici l’activité de ce compte.</string>
+    <string name="aq_home_last_session">Ta dernière séance d’étude</string>
+    <string name="aq_home_session_summary">%1$d révisions · %2$s · %3$d cartes prêtes à la fin</string>
+</resources>
