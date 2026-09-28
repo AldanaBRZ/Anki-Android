@@ -2,6 +2,7 @@
 
 package com.ichi2.anki.ankiquest
 
+import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.AnkiDroidApp
 import com.ichi2.anki.R
@@ -18,12 +19,11 @@ import kotlin.test.assertTrue
 class AnkiquestCompanionTest : RobolectricTest() {
     private fun account(user: String): HomeAccount {
         val preferences = AnkiDroidApp.sharedPrefs()
-        preferences
-            .edit()
-            .putString(Ankiquest.URL_KEY, "https://example.com")
-            .putString(Ankiquest.USER_KEY, user)
-            .putString(Ankiquest.TOKEN_KEY, "token-$user")
-            .commit()
+        preferences.edit(commit = true) {
+            putString(Ankiquest.URL_KEY, "https://example.com")
+            putString(Ankiquest.USER_KEY, user)
+            putString(Ankiquest.TOKEN_KEY, "token-$user")
+        }
         return requireNotNull(AnkiquestHomeData.account())
     }
 
