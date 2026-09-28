@@ -9,6 +9,7 @@ import androidx.preference.Preference
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ichi2.anki.R
 import com.ichi2.anki.RobolectricTest
+import com.ichi2.anki.preferences.AnkiquestNotificationsSettingsFragment
 import com.ichi2.anki.preferences.AnkiquestSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
 import com.ichi2.anki.preferences.PreferencesFragment
@@ -28,10 +29,18 @@ class AnkiquestNotificationHealthDialogTest : RobolectricTest() {
         val intent = PreferencesActivity.getIntent(targetContext, AnkiquestSettingsFragment::class)
         val controller = Robolectric.buildActivity(PreferencesActivity::class.java, intent).setup()
         saveControllerForCleanup(controller)
-        val fragment =
+        val menu =
             (controller.get().fragment as PreferencesFragment)
                 .childFragmentManager
                 .findFragmentById(R.id.settings_container) as AnkiquestSettingsFragment
+        assertNotNull(
+            menu.findPreference<Preference>(targetContext.getString(R.string.ankiquest_notifications_screen_key)),
+        ).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        val fragment =
+            (controller.get().fragment as PreferencesFragment)
+                .childFragmentManager
+                .findFragmentById(R.id.settings_container) as AnkiquestNotificationsSettingsFragment
         val health = assertNotNull(fragment.findPreference<Preference>(targetContext.getString(R.string.ankiquest_health_key)))
 
         health.performClick()
