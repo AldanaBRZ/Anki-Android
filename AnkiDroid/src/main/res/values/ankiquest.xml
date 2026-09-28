@@ -23,6 +23,7 @@
     <string name="ankiquest_deck_notifications_choose_people">Select at least one person, or switch sharing off.</string>
     <string name="ankiquest_deck_notifications_save">@string/save</string>
     <string name="ankiquest_reply">Reply</string>
+    <string name="ankiquest_reply_context">%1$s\n\nIn reply to: %2$s</string>
     <string name="ankiquest_nudges_key" translatable="false">ankiquestNudges</string>
     <string name="ankiquest_nudges_title" maxLength="41">Nudges</string>
     <string name="ankiquest_nudges_summary">Tell me when a place, my best day or the next level is within reach</string>
