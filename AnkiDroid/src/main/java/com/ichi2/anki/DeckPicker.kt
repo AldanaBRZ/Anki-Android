@@ -21,11 +21,13 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.text.util.Linkify
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
@@ -37,6 +39,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.AppCompatCheckBox
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.appcompat.widget.TooltipCompat
@@ -1545,23 +1548,37 @@ open class DeckPicker :
             launchCatchingTask {
                 val summary = AnkiquestStudySession.finish()
                 if (summary != null && sharedPrefs().getBoolean(AnkiquestNavigation.SESSION_SUMMARY_KEY, true)) {
+                    val neverAgain =
+                        AppCompatCheckBox(this@DeckPicker).apply {
+                            setText(R.string.ankiquest_summary_dont_show_again)
+                        }
+                    val content =
+                        LinearLayout(this@DeckPicker).apply {
+                            orientation = LinearLayout.VERTICAL
+                            val padding = (20 * resources.displayMetrics.density).toInt()
+                            setPadding(padding, 0, padding, 0)
+                            addView(
+                                com.ichi2.anki.ankiquest.AnkiquestAki
+                                    .image(
+                                        this@DeckPicker,
+                                        if (summary.remaining == 0) R.drawable.aki_celebrate else R.drawable.aki_streak,
+                                        112,
+                                    ).apply {
+                                        layoutParams =
+                                            LinearLayout
+                                                .LayoutParams(
+                                                    layoutParams,
+                                                ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+                                    },
+                            )
+                            addView(neverAgain)
+                        }
                     val builder =
                         AlertDialog
                             .Builder(this@DeckPicker)
                             .setTitle(R.string.ankiquest_summary_title)
-                            .setView(
-                                com.ichi2.anki.ankiquest.AnkiquestAki.image(
-                                    this@DeckPicker,
-                                    if (summary.remaining ==
-                                        0
-                                    ) {
-                                        R.drawable.aki_celebrate
-                                    } else {
-                                        R.drawable.aki_streak
-                                    },
-                                    112,
-                                ),
-                            ).setMessage(
+                            .setView(content)
+                            .setMessage(
                                 getString(
                                     R.string.ankiquest_summary_body,
                                     summary.reviews,
@@ -1575,7 +1592,11 @@ open class DeckPicker :
                     if (summary.remaining > 0) {
                         builder.setPositiveButton(R.string.ankiquest_summary_continue) { _, _ -> openReviewer() }
                     }
-                    builder.show()
+                    builder.show().setOnDismissListener {
+                        if (neverAgain.isChecked) {
+                            sharedPrefs().edit { putBoolean(AnkiquestNavigation.SESSION_SUMMARY_KEY, false) }
+                        }
+                    }
                 }
                 fragment?.refreshInterface()
             }
