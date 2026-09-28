@@ -102,6 +102,12 @@ class AnkiquestSettingsFragment : SettingsFragment() {
             notify = true,
         )
         bindServerToggle(
+            R.string.ankiquest_celebrations_key,
+            read = { Ankiquest.celebrationsEnabled() },
+            save = { Ankiquest.setCelebrations(it).optBoolean("celebrations", it) },
+            notify = true,
+        )
+        bindServerToggle(
             R.string.ankiquest_streak_protection_key,
             read = { Ankiquest.streakProtectionEnabled() },
             save = { Ankiquest.setStreakProtection(it) },
