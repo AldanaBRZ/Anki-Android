@@ -42,17 +42,46 @@ class AnkiquestLanguageTest : RobolectricTest() {
 
     @Test
     fun `French German and Portuguese resources follow Anki language in widgets and daily decks`() {
-        for ((tag, friends, done, health, widget) in listOf(
-            listOf("fr-FR", "Amis", "Terminé pour aujourd’hui", "État des notifications", "Quel classement ?"),
-            listOf("de-DE", "Freunde", "Für heute erledigt", "Benachrichtigungsstatus", "Welche Rangliste?"),
-            listOf("pt-PT", "Amigos", "Concluído por hoje", "Estado das notificações", "Qual classificação?"),
+        for (expected in listOf(
+            listOf(
+                "fr-FR",
+                "Amis",
+                "Terminé pour aujourd’hui",
+                "État des notifications",
+                "Quel classement ?",
+                "Rappel de série",
+                "Je m’en occupe !",
+            ),
+            listOf(
+                "de-DE",
+                "Freunde",
+                "Für heute erledigt",
+                "Benachrichtigungsstatus",
+                "Welche Rangliste?",
+                "Lernserien-Erinnerung",
+                "Ich kümmere mich darum!",
+            ),
+            listOf(
+                "pt-PT",
+                "Amigos",
+                "Concluído por hoje",
+                "Estado das notificações",
+                "Qual classificação?",
+                "Lembrete da sequência",
+                "Já trato disso!",
+            ),
         )) {
+            val (tag, friends, done, health, widget) = expected
+            val reminder = expected[5]
+            val reply = expected[6]
             AnkiDroidApp.sharedPrefs().edit { putString("language", tag) }
             val localized = AnkiquestLanguage.context(targetContext)
             assertEquals(friends, localized.getString(R.string.ankiquest_nav_friends))
             assertEquals(done, localized.getString(R.string.aq_deck_done))
             assertEquals(health, localized.getString(R.string.ankiquest_health_title))
             assertEquals(widget, localized.getString(R.string.ankiquest_widget_period_title))
+            assertEquals(reminder, localized.getString(R.string.ankiquest_streak_hours_title))
+            assertEquals(reply, localized.getString(R.string.ankiquest_reply_on_it))
         }
     }
 
