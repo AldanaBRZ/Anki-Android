@@ -36,6 +36,7 @@ import com.ichi2.anki.DeckPicker
 import com.ichi2.anki.R
 import com.ichi2.anki.common.destinations.StatisticsDestination
 import com.ichi2.anki.common.destinations.navigate
+import com.ichi2.anki.common.time.TimeManager
 import com.ichi2.anki.preferences.AnkiquestSettingsFragment
 import com.ichi2.anki.preferences.PreferencesActivity
 import kotlinx.coroutines.CancellationException
@@ -649,10 +650,10 @@ class AnkiquestHomeActivity : AnkiActivity(R.layout.activity_ankiquest_home) {
     }
 
     private fun activityDay(createdAt: Long): String {
-        val then = Calendar.getInstance().apply { timeInMillis = createdAt * 1000 }
-        val today = Calendar.getInstance()
+        val then = TimeManager.time.calendar().apply { timeInMillis = createdAt * 1000 }
+        val today = TimeManager.time.calendar()
         if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR) && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {
-            return getString(R.string.aq_home_filter_today)
+            return getString(R.string.ankiquest_nav_today)
         }
         today.add(Calendar.DAY_OF_YEAR, -1)
         if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR) && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {

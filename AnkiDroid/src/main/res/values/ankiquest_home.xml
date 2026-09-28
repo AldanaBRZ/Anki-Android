@@ -89,7 +89,7 @@
     <string name="aq_home_inbox_retention">Invitations and messages from the last 90 days.</string>
     <string name="aq_home_unread">Unread</string>
     <string name="aq_home_mark_all_read">Mark all as read</string>
-    <string name="aq_home_filter_all">All</string>
+    <string name="aq_home_filter_all">All activity</string>
     <string name="aq_home_needs_action">Needs action</string>
     <string name="aq_home_needs_action_count">Needs action · %1$d</string>
     <string name="aq_home_needs_action_hint">Invitations stay here until you respond, even after you read them.</string>
@@ -100,7 +100,6 @@
     <string name="aq_home_filter_decks">Deck completions</string>
     <string name="aq_home_filter_study">Study updates</string>
     <string name="aq_home_unread_only">Unread only</string>
-    <string name="aq_home_filter_today">Today</string>
     <string name="aq_home_filter_yesterday">Yesterday</string>
     <string name="aq_home_no_action">No invitations need a response.</string>
     <string name="aq_home_no_unread">No unread notifications here.</string>
