@@ -35,6 +35,23 @@ import kotlin.test.assertTrue
 @Config(sdk = [32])
 class AnkiquestNotifierTest : RobolectricTest() {
     @Test
+    fun `a reply alert shows the message it answers`() {
+        val manager = targetContext.getSystemService<NotificationManager>()!!
+        val account = replyAccount()
+        val reply =
+            message(1, 30)
+                .put("sender", "cerro")
+                .put("kind", "reply")
+                .put("body", "Good job!")
+                .put("reply_to", JSONObject().put("title", "Deck complete").put("body", "Cerro finished Spanish."))
+        AnkiquestNotifier.onDeckCompletions(targetContext, account.notificationAccount, JSONArray().put(reply), account.scope)
+        val posted = shadowOf(manager).getNotification(5_140_001)
+        val shown = posted.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString()
+        assertTrue(shown.contains("Cerro finished Spanish."))
+        assertTrue(shown.contains("Good job!"))
+    }
+
+    @Test
     fun `Spanish contextual replies follow the Anki language and retain notification kind`() {
         val manager = targetContext.getSystemService<NotificationManager>()!!
         val account = replyAccount()

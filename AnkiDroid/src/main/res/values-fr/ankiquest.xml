@@ -18,6 +18,7 @@
     <string name="ankiquest_deck_notifications_choose_people">Choisis au moins une personne ou désactive le partage.</string>
     <string name="ankiquest_deck_notifications_save">@string/save</string>
     <string name="ankiquest_reply">Réponse</string>
+    <string name="ankiquest_reply_context">%1$s\n\nEn réponse à : %2$s</string>
     <string name="ankiquest_nudges_title">Coups de pouce</string>
     <string name="ankiquest_nudges_summary">Préviens-moi quand une place, mon meilleur jour ou le prochain niveau est à portée</string>
     <string name="ankiquest_celebrations_title">Célébrations</string>

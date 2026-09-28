@@ -71,13 +71,17 @@ object AnkiquestNotifier {
             val tag = 5_140_000 + (id % 1_000_000).toInt()
             val title = entry.getString("title")
             val body = entry.getString("body")
+            val shownBody =
+                entry.optJSONObject("reply_to")?.optString("body")?.takeIf { it.isNotBlank() }?.let { original ->
+                    AnkiquestLanguage.context(context).getString(R.string.ankiquest_reply_context, body, original)
+                } ?: body
             val answerable = entry.optString("sender").isNotEmpty() && !entry.optBoolean("replied")
             if (fresh &&
                 notify(
                     context,
                     tag,
                     title,
-                    body,
+                    shownBody,
                     notificationIntent(context, entry, account),
                     if (answerable) {
                         AnkiquestReply.actions(
@@ -85,7 +89,7 @@ object AnkiquestNotifier {
                             id,
                             tag,
                             title,
-                            body,
+                            shownBody,
                             account,
                             scope,
                             entry.optString("kind", "completion"),
