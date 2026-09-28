@@ -40,6 +40,7 @@ data class DisplayDeckNode private constructor(
     val lrnCount: Int,
     val revCount: Int,
     val isSelected: Boolean,
+    val dailyState: com.ichi2.anki.ankiquest.DailyDeckState? = null,
 ) {
     // DeckNode is mutable, so use a lateinit var so '==' doesn't include it in the comparison
     lateinit var deckNode: DeckNode
@@ -48,6 +49,9 @@ data class DisplayDeckNode private constructor(
         this.copy(isSelected = this.did == deckId).also { updated ->
             updated.deckNode = this.deckNode
         }
+
+    fun withDailyState(state: com.ichi2.anki.ankiquest.DailyDeckState?): DisplayDeckNode =
+        copy(dailyState = state).also { it.deckNode = deckNode }
 
     companion object {
         fun from(

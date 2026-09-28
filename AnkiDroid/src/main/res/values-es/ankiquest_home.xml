@@ -8,7 +8,6 @@
     <string name="aq_home_next_step">Tu próximo paso</string>
     <string name="aq_home_study_due">Estudiar %1$d tarjetas pendientes</string>
     <string name="aq_home_counts">%1$d repasos · %2$d aprendiendo · %3$d nuevas</string>
-    <string name="aq_home_nothing_due">No hay tarjetas listas en este mazo. El próximo repaso aparecerá cuando corresponda.</string>
     <string name="aq_home_change_deck">Cambiar mazo de estudio</string>
     <string name="aq_home_open_decks">Abrir mazos</string>
     <string name="aq_home_no_decks">Tu estudio empieza con un mazo.</string>

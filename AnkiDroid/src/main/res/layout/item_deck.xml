@@ -38,19 +38,33 @@
             android:minWidth="48dp"
             android:padding="12dp"
             android:background="?attr/selectableItemBackgroundBorderless" />
-        <com.ichi2.ui.FixedTextView
-            android:id="@+id/deck_name"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:background="@color/transparent"
-            android:gravity="start|center_vertical"
-            android:maxLines="2"
-            android:ellipsize="end"
-            android:textColor="?android:textColorPrimary"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            tools:text="Deck name" />
+            android:orientation="vertical">
+            <com.ichi2.ui.FixedTextView
+                android:id="@+id/deck_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:background="@color/transparent"
+                android:gravity="start|center_vertical"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:textColor="?android:textColorPrimary"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="Deck name" />
+            <TextView
+                android:id="@+id/deck_daily_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:paddingBottom="6dp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

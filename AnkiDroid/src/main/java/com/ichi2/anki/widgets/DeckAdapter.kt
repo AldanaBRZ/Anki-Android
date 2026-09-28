@@ -14,6 +14,7 @@ import androidx.core.content.withStyledAttributes
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
+import androidx.core.widget.TextViewCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -166,6 +167,30 @@ class DeckAdapter(
         // Set deck name and colour. Filtered decks have their own colour
         binding.deckName.text = node.lastDeckNameComponent
         binding.deckName.setTextColor(if (node.filtered) deckNameDynColor else deckNameDefaultColor)
+
+        binding.deckDailyStatus.isVisible = node.dailyState != null
+        node.dailyState?.let { daily ->
+            val status = binding.deckDailyStatus
+            status.text = daily.label(status.context)
+            status.setTextColor(status.context.getColor(daily.color))
+            status.setCompoundDrawablesRelativeWithIntrinsicBounds(daily.icon, 0, 0, 0)
+            TextViewCompat.setCompoundDrawableTintList(
+                status,
+                android.content.res.ColorStateList
+                    .valueOf(status.context.getColor(daily.color)),
+            )
+            status.compoundDrawablePadding = 4.dp.toPx(status.context)
+            if (daily.status == com.ichi2.anki.ankiquest.DailyDeckStatus.DONE && !node.isSelected) {
+                binding.deckLayout.backgroundTintList =
+                    android.content.res.ColorStateList
+                        .valueOf(status.context.getColor(R.color.aq_deck_done_background))
+            }
+        }
+        if (node.dailyState?.status != com.ichi2.anki.ankiquest.DailyDeckStatus.DONE ||
+            node.isSelected
+        ) {
+            binding.deckLayout.backgroundTintList = null
+        }
 
         // Set the card counts and their colors
         binding.deckNew.text = node.newCount.toString()

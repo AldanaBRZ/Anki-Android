@@ -58,6 +58,34 @@ class AnkiquestHomeActivityTest : RobolectricTest() {
     }
 
     @Test
+    fun `an empty unstudied deck is clearly labelled nothing scheduled today`() {
+        coEvery { AnkiquestHomeData.local() } returns HomeLocal(listOf(HomeDeck(12, "Spanish", 0, 0, 0)), 12)
+        val home = launch()
+        assertTrue(home.hasText("Nothing scheduled today"))
+    }
+
+    @Test
+    fun `learning later shows its next time without inviting an empty study session`() {
+        val next =
+            com.ichi2.anki.common.time.TimeManager.time
+                .intTimeMS() + 3_600_000L
+        val daily = DailyDeckState(0, 1, 1, next)
+        coEvery { AnkiquestHomeData.local() } returns HomeLocal(listOf(HomeDeck(12, "Spanish", 0, 0, 0, daily)), 12)
+        val home = launch()
+        assertTrue(home.hasTextContaining("Learning later today"))
+        assertFalse(home.hasText(home.getString(R.string.aq_home_study_due, 0)))
+    }
+
+    @Test
+    fun `completed deck has a done state without an empty study action`() {
+        val daily = DailyDeckState(0, 0, 1)
+        coEvery { AnkiquestHomeData.local() } returns HomeLocal(listOf(HomeDeck(12, "Spanish", 0, 0, 0, daily)), 12)
+        val home = launch()
+        assertTrue(home.hasText("Done today"))
+        assertFalse(home.hasText(home.getString(R.string.aq_home_study_due, 0)))
+    }
+
+    @Test
     fun `Today studies the local focus deck and shows server quests`() {
         val home = launch()
         assertTrue(home.hasText("Spanish"))
@@ -128,6 +156,9 @@ class AnkiquestHomeActivityTest : RobolectricTest() {
 
     private fun AnkiquestHomeActivity.hasText(value: String): Boolean =
         findViewById<View>(R.id.aq_home_content).allViews.filterIsInstance<TextView>().any { it.text.toString() == value }
+
+    private fun AnkiquestHomeActivity.hasTextContaining(value: String): Boolean =
+        findViewById<View>(R.id.aq_home_content).allViews.filterIsInstance<TextView>().any { it.text.toString().contains(value) }
 
     private fun AnkiquestHomeActivity.click(label: String) {
         val control =
