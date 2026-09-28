@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
     <string name="aq_deck_later">Lernen später heute · nächste Wiederholung um %1$s</string>
     <string name="aq_deck_done">Für heute erledigt</string>

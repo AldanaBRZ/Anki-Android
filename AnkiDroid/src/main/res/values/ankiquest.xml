@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="ankiquest_dashboard_key" translatable="false">ankiquestDashboard</string>
     <string name="ankiquest_dashboard_title" maxLength="41">Leaderboard</string>

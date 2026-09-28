@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/ankiquest_nav_today" android:icon="@drawable/home_icon" android:title="@string/ankiquest_nav_today" />
     <item android:id="@+id/ankiquest_nav_friends" android:icon="@drawable/ic_people_black_24dp" android:title="@string/ankiquest_nav_friends" />

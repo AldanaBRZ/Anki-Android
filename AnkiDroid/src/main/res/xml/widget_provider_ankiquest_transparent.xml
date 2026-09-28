@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.ichi2.anki.ankiquest.AnkiquestWidgetConfig"
     android:description="@string/ankiquest_widget_transparent_description"
